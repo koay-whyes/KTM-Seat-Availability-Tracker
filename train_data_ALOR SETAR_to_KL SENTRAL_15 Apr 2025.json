@@ -1,0 +1,37 @@
+[
+    {
+        "train_service": "Platinum - 9273",
+        "departure": "07:59",
+        "arrival": "12:45",
+        "seats_left": "14",
+        "fare": "MYR 103.00"
+    },
+    {
+        "train_service": "Platinum - 9275",
+        "departure": "10:24",
+        "arrival": "15:10",
+        "seats_left": "4",
+        "fare": "MYR 101.00"
+    },
+    {
+        "train_service": "Express - 9207",
+        "departure": "14:26",
+        "arrival": "18:40",
+        "seats_left": "4",
+        "fare": "MYR 112.00"
+    },
+    {
+        "train_service": "Gold - 9425",
+        "departure": "16:35",
+        "arrival": "21:34",
+        "seats_left": "2",
+        "fare": "MYR 75.00"
+    },
+    {
+        "train_service": "Platinum - 9279",
+        "departure": "17:39",
+        "arrival": "22:25",
+        "seats_left": "4",
+        "fare": "MYR 103.00"
+    }
+]
