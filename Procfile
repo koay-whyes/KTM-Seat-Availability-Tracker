@@ -1,1 +1,1 @@
-bot: python ETS scraper.ipynb
+worker: python ETS-scraper.py
