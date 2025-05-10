@@ -44,9 +44,12 @@ url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={
 r = requests.get(url)
 print(r.json())
 
-origin = input("Enter the origin station (IN ALL CAPS, EXACTLY THE SAME AS THE WEBSITE, NO SPACE BEHIND): ")
-dest = input("Enter the destination station (IN ALL CAPS, EXACTLY THE SAME AS THE WEBSITE, NO SPACE BEHIND): ")
-date = input("Enter the departure date (exp: 1 Jan 2025): ")
+# origin = input("Enter the origin station (IN ALL CAPS, EXACTLY THE SAME AS THE WEBSITE, NO SPACE BEHIND): ")
+# dest = input("Enter the destination station (IN ALL CAPS, EXACTLY THE SAME AS THE WEBSITE, NO SPACE BEHIND): ")
+# date = input("Enter the departure date (exp: 1 Jan 2025): ")
+origin = "KL SENTRAL"
+dest = "ALOR SETAR"
+date = "30 May 2025"
 
 
 # In[ ]:
