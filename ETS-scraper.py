@@ -20,7 +20,11 @@ from bs4 import BeautifulSoup
 import requests
 import json
 import os
-
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler, filters,
+    ConversationHandler, ContextTypes
+)
 
 
 # In[2]:
@@ -35,13 +39,17 @@ message = 'null'
 
 # In[ ]:
 
+message = 'Welcome to ETS/Intercity Web Scraper! \n\n***************************************** \nPlease enter the following details to get started :)'
+url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
+r = requests.get(url)
+print(r.json())
 
-print("ETS/Intercity Web Scraper")
-print("Please enter the following details to get started")
-
-origin = input("Enter the origin station (IN ALL CAPS, EXACTLY THE SAME AS THE WEBSITE, NO SPACE BEHIND): ")
-dest = input("Enter the destination station (IN ALL CAPS, EXACTLY THE SAME AS THE WEBSITE, NO SPACE BEHIND): ")
-date = input("Enter the departure date (exp: 1 Jan 2025): ")
+# origin = input("Enter the origin station (IN ALL CAPS, EXACTLY THE SAME AS THE WEBSITE, NO SPACE BEHIND): ")
+# dest = input("Enter the destination station (IN ALL CAPS, EXACTLY THE SAME AS THE WEBSITE, NO SPACE BEHIND): ")
+# date = input("Enter the departure date (exp: 1 Jan 2025): ")
+origin = "KL SENTRAL"
+dest = "ALOR SETAR"
+date = "30 May 2025"
 
 
 # In[ ]:
@@ -127,82 +135,6 @@ close_calendar = driver.find_element(By.ID,  "trainBack")
 close_calendar.click()
 depart_date = wait.until(EC.presence_of_element_located((By.ID, "OnwardDate")))
 depart_date.click()
-
-
-# In[ ]:
-
-
-"""# Select the year
-year_dropdown = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".lightpick__select-years")))
-year_dropdown.click()
-year_option = wait.until(EC.element_to_be_clickable((By.XPATH, "//option[@value='2025']")))
-year_option.click()"""
-
-# Select the month
-"""
-month_dropdown = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".lightpick__select-months")))
-month_dropdown.click()
-month_option = wait.until(EC.element_to_be_clickable((By.XPATH, "//option[@value='1']")))  
-month_option.click()
-desired_month = 1  
-while True:
-    current_month = int(
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".lightpick__select-months option[selected='selected']"))).get_attribute("value")
-    )
-    if current_month == desired_month:
-        break
-
-    # Switch to the iframe containing the calendar
-    iframe = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "iframe_selector")))  # Replace with actual iframe selector
-    driver.switch_to.frame(iframe)
-
-    # Interact with the "Next" button inside the iframe
-    next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".lightpick__next-action")))
-    next_button.click()
-
-    # Switch back to the main page after interacting with the iframe
-    driver.switch_to.default_content()
-    """
-
-
-
-
-# In[ ]:
-
-
-"""# Desired month (0-based index; 0 = January, 1 = February, etc.)
-desired_month = 1
-
-while True:
-    # Check the currently selected month
-    current_month = int(
-        wait.until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR, ".lightpick__select-months option[selected='selected']")
-        )).get_attribute("value")
-    )
-    if current_month == desired_month:
-        break
-
-    try:
-        # Wait for the iframe containing the calendar
-        iframe = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "iframe_selector")))  # Replace with the actual iframe selector
-        driver.switch_to.frame(iframe)  # Switch to the iframe
-
-        # Wait for the "Next" button inside the iframe
-        next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".lightpick__next-action2")))
-        next_button.click()
-        print("Clicked the 'Next' button to navigate months.")
-    except Exception as e:
-        print(f"Error interacting with 'Next' button: {e}")
-    finally:
-        # Switch back to the main content after interacting with the iframe
-        driver.switch_to.default_content()
-"""
-"""# Select the day
-desired_day = "18"
-day_element = wait.until(EC.element_to_be_clickable((By.XPATH, f"//div[contains(@class, 'lightpick__day') and text()='{desired_day}' and contains(@class, 'is-available')]")))
-day_element.click()"""
-
 
 # In[ ]:
 
@@ -298,33 +230,3 @@ while True:
     
     sleep(10)
     driver.refresh()
-
-
-# In[ ]:
-
-
-# Inefficient way to extract data
-"""
-train_service = []
-depart = []
-arrival = []
-seats = []
-fare = []
-for row in target_table.find("tbody").find_all("tr"):
-    cell = row.find_all("td")[0]  # Adjust index for the column
-    train_service.append(cell.text.strip())
-    cell = row.find_all("td")[1]  # Adjust index for the column
-    depart.append(cell.text.strip())
-    cell = row.find_all("td")[2]  # Adjust index for the column
-    arrival.append(cell.text.strip())
-    cell = row.find_all("td")[4]  # Adjust index for the column
-    seats.append(cell.text.strip())
-    cell = row.find_all("td")[5]  # Adjust index for the column
-    fare.append(cell.text.strip())
-
-print(train_service)
-print(depart)
-print(arrival)
-print(seats)
-print(fare)"""
-
