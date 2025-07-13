@@ -30,7 +30,7 @@ from telegram.ext import (
 # In[2]:
 
 
-chromedriver_path = 'C:/chromedriver-win64/chromedriver-win64/chromedriver.exe' 
+chromedriver_path = 'C:/chromedriver-win64/chromedriver.exe' 
 
 TOKEN = '7588270975:AAFkEvc-Hf_ygG1Z6BgVv-n2iLLBXgrDH6k'
 chat_id = '1235697766'
@@ -49,7 +49,7 @@ print(r.json())
 # date = input("Enter the departure date (exp: 1 Jan 2025): ")
 origin = "KL SENTRAL"
 dest = "ALOR SETAR"
-date = "30 May 2025"
+date = "30 Jul 2025"
 
 
 # In[ ]:
