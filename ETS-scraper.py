@@ -25,12 +25,16 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters,
     ConversationHandler, ContextTypes
 )
-
+from webdriver_manager.chrome import ChromeDriverManager
 
 # In[2]:
+options = Options()
+options.add_argument('--headless')
+options.add_argument('--no-sandbox')
+options.add_argument('--disable-dev-shm-usage')
 
-
-chromedriver_path = 'C:/chromedriver-win64/chromedriver.exe' 
+# parameters for ChromeDriver(chromedriver_path, options=options)
+driver = webdriver.Chrome(service=webdriver.ChromeService(ChromeDriverManager().install()), options=options)
 
 TOKEN = '7588270975:AAFkEvc-Hf_ygG1Z6BgVv-n2iLLBXgrDH6k'
 chat_id = '1235697766'
@@ -51,15 +55,6 @@ origin = "KL SENTRAL"
 dest = "ALOR SETAR"
 date = "30 Jul 2025"
 
-
-# In[ ]:
-
-
-# Create a Service object with the path to ChromeDriver
-service = Service(chromedriver_path)
-
-# Initialize WebDriver / chrome instance - automate tab open
-driver = webdriver.Chrome(service=service)
 sleep(2)
 
 
