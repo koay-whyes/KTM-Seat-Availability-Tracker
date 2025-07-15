@@ -36,9 +36,6 @@ def main():
             chat_id = '1235697766'
             message = 'null'
 
-
-
-
             message = 'Welcome to ETS/Intercity Web Scraper! \n\n***************************************** \nPlease enter the following details to get started :)'
             url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
             r = requests.get(url)
@@ -53,17 +50,9 @@ def main():
 
             sleep(2)
 
-
-
-
-
             ktmb = 'https://online.ktmb.com.my'
             driver.get(ktmb)
             sleep(3)
-
-
-
-
 
             # Define XPath
             xp_popup_close = '//button[contains(@class, "btn payment-modal-btn")]'
@@ -71,14 +60,15 @@ def main():
             # Find all matching elements
             popup_buttons = driver.find_elements(By.XPATH, xp_popup_close)
 
+            # Close ad button (Website popup)
             # Access the specific button (index 3 for the fourth button)
-            try:
-                specific_button = popup_buttons[3]  # 4th button
-                specific_button.click() 
-            except IndexError:
-                print("Button at the specified index not found.")
-            except Exception as e:
-                print("An error occurred:", e)
+            # try:
+            #     specific_button = popup_buttons[3]  # 4th button
+            #     specific_button.click() 
+            # except IndexError:
+            #     print("Button at the specified index not found.")
+            # except Exception as e:
+            #     print("An error occurred:", e)
 
 
 
@@ -135,14 +125,8 @@ def main():
             close_button.click()
 
 
-
-
-
             search_button = wait.until(EC.element_to_be_clickable((By.ID, "btnSubmit")))
             search_button.click()
-
-
-
 
 
             while True:
