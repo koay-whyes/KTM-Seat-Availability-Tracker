@@ -172,17 +172,41 @@ def main():
                 for train in train_data:
                     print(train)
                 
-                file_name = f"train_data_{origin}_to_{dest}_{date}.json"
-                file_path = os.path.join(os.getcwd(), file_name)
+                # file_name = f"train_data_{origin}_to_{dest}_{date}.json"
+                # file_path = os.path.join(os.getcwd(), file_name)
                 
-                # compare and notify
+                # # compare and notify
 
-                if os.path.exists(file_path):
-                    # Load previous data
-                    with open(file_path, "r") as file:
-                        previous_data = json.load(file)
+                # if os.path.exists(file_path):
+                #     # Load previous data
+                #     with open(file_path, "r") as file:
+                #         previous_data = json.load(file)
                     
-                    # Compare new data with previous data
+                #     # Compare new data with previous data
+                #     if train_data != previous_data:
+                #         print("Data has changed")
+                #         for i in range(len(train_data)):
+                #             if train_data[i]['seats_left'] != previous_data[i]['seats_left']:
+                #                 message = 'Seats number changed for ' + train_data[i]['train_service'] + ' departing at ' + train_data[i]['departure']
+                #                 url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
+                #                 r = requests.get(url)
+                #                 print(r.json())
+                            
+                #         # Save the new data
+                #         with open(file_path, "w") as file:
+                #             json.dump(train_data, file, indent=4)
+                #     else:
+                #         print("No changes detected")
+                # else:
+                #     # File doesn't exist; save new data
+                #     with open(file_path, "w") as file:
+                #         json.dump(train_data, file, indent=4)
+                #     print("Data saved for the first time")
+
+                previous_data = None  # Store data in memory instead of files
+
+                def compare_data(new_data):
+                    global previous_data
                     if train_data != previous_data:
                         print("Data has changed")
                         for i in range(len(train_data)):
@@ -190,18 +214,6 @@ def main():
                                 message = 'Seats number changed for ' + train_data[i]['train_service'] + ' departing at ' + train_data[i]['departure']
                                 url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
                                 r = requests.get(url)
-                                print(r.json())
-                            
-                        # Save the new data
-                        with open(file_path, "w") as file:
-                            json.dump(train_data, file, indent=4)
-                    else:
-                        print("No changes detected")
-                else:
-                    # File doesn't exist; save new data
-                    with open(file_path, "w") as file:
-                        json.dump(train_data, file, indent=4)
-                    print("Data saved for the first time")
                 
                 sleep(10)
                 driver.refresh()
