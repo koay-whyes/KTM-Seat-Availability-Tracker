@@ -44,9 +44,9 @@ def main():
             # origin = input("Enter the origin station (IN ALL CAPS, EXACTLY THE SAME AS THE WEBSITE, NO SPACE BEHIND): ")
             # dest = input("Enter the destination station (IN ALL CAPS, EXACTLY THE SAME AS THE WEBSITE, NO SPACE BEHIND): ")
             # date = input("Enter the departure date (exp: 1 Jan 2025): ")
-            origin = "KL SENTRAL"
-            dest = "ALOR SETAR"
-            date = "30 Jul 2025"
+            origin = "ALOR SETAR"
+            dest = "KL SENTRAL"
+            date = "1 Sep 2025"
 
             sleep(2)
 
