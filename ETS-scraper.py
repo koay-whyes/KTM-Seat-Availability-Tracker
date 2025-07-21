@@ -126,8 +126,18 @@ def main():
 
 
             search_button = wait.until(EC.element_to_be_clickable((By.ID, "btnSubmit")))
-            search_button.click()
+            search_button.click() 
+           
+            TEST_MODE = False  # Set to False in production
 
+            if TEST_MODE:
+                previous_data = [{'train_service': 'Platinum - 9272', 'departure': '07:20', 'arrival': '12:02', 'seats_left': '999', 'fare': 'MYR 102.00'},
+                                {'train_service': 'Platinum - 9274', 'departure': '09:55', 'arrival': '14:37', 'seats_left': '999', 'fare': 'MYR 102.00'},
+                                {'train_service': 'Gold - 9420', 'departure': '10:41', 'arrival': '15:36', 'seats_left': '999', 'fare': 'MYR 74.00'},
+                                {'train_service': 'Express - 9206', 'departure': '18:00', 'arrival': '22:14', 'seats_left': '999', 'fare': 'MYR 114.00'},
+                                {'train_service': 'Platinum - 9278', 'departure': '22:50', 'arrival': '03:32\n                                        +1', 'seats_left': '999', 'fare': 'MYR 99.00'}]
+            else:
+                previous_data = None  # Initialize previous_data to None for production
 
             while True:
                 
@@ -203,10 +213,9 @@ def main():
                 #         json.dump(train_data, file, indent=4)
                 #     print("Data saved for the first time")
 
-                previous_data = None  # Store data in memory instead of files
-
-                def compare_data(new_data):
-                    global previous_data
+                def compare_data(train_data, previous_data):
+                    if previous_data is None:
+                        return
                     if train_data != previous_data:
                         print("Data has changed")
                         for i in range(len(train_data)):
@@ -215,6 +224,9 @@ def main():
                                 url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
                                 r = requests.get(url)
                 
+                compare_data(train_data, previous_data)
+                # Save the new data in memory
+                previous_data = train_data
                 sleep(10)
                 driver.refresh()
 
