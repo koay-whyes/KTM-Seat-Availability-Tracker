@@ -298,7 +298,13 @@ async def start_scraping(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     await update.message.reply_text("Scraping completed")
 
-
+def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log errors caused by Updates."""
+    error = context.error
+    if isinstance(error, Conflict):
+        print("Another bot instance is already running!")
+    else:
+        print(f"Error: {error}")
 def main():
 
     message = 'Welcome to KTM Seat Availability Tracker! Please type /start to begin.'
@@ -306,6 +312,9 @@ def main():
     r = requests.get(url)
     
     application = ApplicationBuilder().token(TOKEN).build()
+    
+    # Register error handler
+    application.add_error_handler(error_handler)
     
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
