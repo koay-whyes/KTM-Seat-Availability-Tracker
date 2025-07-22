@@ -1,3 +1,4 @@
+from email.mime import application
 from time import sleep, strftime
 from random import randint
 import pandas as pd
@@ -17,9 +18,10 @@ import os
 import asyncio
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, MenuButtonCommands
+from telegram.error import Conflict
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, filters,
+    Application, ApplicationBuilder, CommandHandler, MessageHandler, filters,
     ConversationHandler, ContextTypes
 )
 from webdriver_manager.chrome import ChromeDriverManager
@@ -71,7 +73,7 @@ async def receive_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     asyncio.create_task(start_scraping(update, context))
     return ConversationHandler.END
 
-def run_selenium(context_data):
+def run_selenium(context_data, stop_event):
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
@@ -176,7 +178,7 @@ def run_selenium(context_data):
         else:
             previous_data = None  # Initialize previous_data to None for production
 
-        while True:
+        while not stop_event.is_set():
             # Wait for the table to load (adjust the timeout and conditions as needed)
             try:
                 WebDriverWait(driver, 10).until(
@@ -284,19 +286,39 @@ def run_selenium(context_data):
             driver.refresh()
             
     except Exception as e:
-        print(f"Critical error: {str(e)}")
+        print(f"Selenium error: {str(e)}")
     finally:
         driver.quit()
 
 async def start_scraping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Wrapper to run selenium in thread"""
     loop = asyncio.get_running_loop()
+    stop_event = threading.Event()
+    context.user_data['stop_event'] = stop_event  # Store for later access
+    
     with ThreadPoolExecutor() as pool:
         await loop.run_in_executor(
             pool, 
-            lambda: run_selenium(context.user_data.copy())
+            lambda: run_selenium(context.user_data.copy(), stop_event)
         )
     await update.message.reply_text("Scraping completed")
+
+async def stop_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Stop the bot gracefully"""
+    if 'stop_event' in context.user_data:
+        context.user_data['stop_event'].set()
+    await update.message.reply_text("Stopping bot...")
+    # This will stop the polling
+    context.application.stop()
+    return ConversationHandler.END
+
+async def post_init(application: Application):
+    """Set the bot commands menu after initialization"""
+    await application.bot.set_my_commands([
+        ("start", "Start the KTM tracker"),
+        ("stop", "Stop the current tracking")
+    ])
+    await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
 
 def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log errors caused by Updates."""
@@ -305,29 +327,54 @@ def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         print("Another bot instance is already running!")
     else:
         print(f"Error: {error}")
-def main():
 
-    message = 'Welcome to KTM Seat Availability Tracker! Please type /start to begin.'
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
-    r = requests.get(url)
+def main():
+    # Create an event to signal shutdown
+    stop_event = threading.Event()
     
-    application = ApplicationBuilder().token(TOKEN).build()
-    
-    # Register error handler
-    application.add_error_handler(error_handler)
-    
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            ORIGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_origin)],
-            DESTINATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_destination)],
-            DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_date)],
-        },
-        fallbacks=[CommandHandler('start', start)]
-    )
-    
-    application.add_handler(conv_handler)
-    application.run_polling()
+    try:
+        message = 'Welcome to KTM Seat Availability Tracker! Please type /start to begin.'
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
+        r = requests.get(url)
+        
+        application = ApplicationBuilder().token(TOKEN).build()
+
+        # Register error handler
+        application.add_error_handler(error_handler)
+
+        application.add_handler(CommandHandler('stop', stop_bot))
+        
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler('start', start)],
+            states={
+                ORIGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_origin)],
+                DESTINATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_destination)],
+                DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_date)],
+            },
+            fallbacks=[CommandHandler('start', start)]
+        )
+        
+        application.add_handler(conv_handler)
+        
+        # Store the application in a global variable for cleanup
+        global bot_application
+        bot_application = application
+        
+        print("Bot started. Press Ctrl+C to stop.")
+        application.run_polling(stop_signals=None)  # Disable default signal handling
+
+        
+    except KeyboardInterrupt:
+        print("\nShutting down gracefully...")
+        stop_event.set()
+        if 'bot_application' in globals():
+            bot_application.stop()
+            bot_application.shutdown()
+        print("Bot stopped successfully.")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        stop_event.set()
 
 if __name__ == "__main__":
     main()
