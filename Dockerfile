@@ -1,6 +1,7 @@
 FROM python:3.11-slim
 
 # Install required system dependencies
+# Install required system dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -38,6 +39,9 @@ RUN mkdir -p /etc/apt/keyrings && \
 
 # Install Python dependencies
 WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
