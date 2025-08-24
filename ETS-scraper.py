@@ -84,7 +84,6 @@ def run_selenium(context_data, stop_event):
     options.add_argument('--disable-infobars')
     options.add_argument('--window-size=1920,1080')
 
-    service = Service(executable_path='/usr/bin/chromedriver')
     driver = webdriver.Chrome(
         service=Service(ChromeDriverManager().install()),
         options=options
