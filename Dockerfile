@@ -1,7 +1,6 @@
 FROM python:3.11-slim
 
 # Install required system dependencies
-# Install required system dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -26,18 +25,28 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     ca-certificates \
     curl && \
-    rm -rf /var/lib/apt/lists/*  # Clean up to reduce image size
+    rm -rf /var/lib/apt/lists/*
 
-# Install Chrome using the modern approach (without apt-key)
+# Install Chrome
 RUN mkdir -p /etc/apt/keyrings && \
     wget -q -O /etc/apt/keyrings/google-chrome.gpg https://dl.google.com/linux/linux_signing_key.pub && \
     echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
     apt-get update && \
     apt-get install -y google-chrome-stable && \
-    rm -rf /var/lib/apt/lists/*  # Clean up
+    rm -rf /var/lib/apt/lists/*
 
-# Install ChromeDriver using webdriver-manager (let Python handle it)
-# This is better than manual installation since it ensures version compatibility
+# Install ChromeDriver (specific version for compatibility)
+RUN CHROME_VERSION=$(google-chrome --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') && \
+    CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION%.*}") && \
+    wget -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" && \
+    unzip chromedriver_linux64.zip && \
+    mv chromedriver /usr/local/bin/ && \
+    chmod +x /usr/local/bin/chromedriver && \
+    rm chromedriver_linux64.zip
+
+# Set Chrome binary path
+ENV CHROME_BIN=/usr/bin/google-chrome-stable
+ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
 
 # Install Python dependencies
 WORKDIR /app
