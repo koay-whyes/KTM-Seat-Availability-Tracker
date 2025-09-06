@@ -25,23 +25,22 @@ RUN apt-get update && apt-get install -y \
     libxrandr2 \
     xdg-utils \
     ca-certificates \
-    curl
+    curl && \
+    rm -rf /var/lib/apt/lists/*  # Clean up to reduce image size
 
 # Install Chrome using the modern approach (without apt-key)
 RUN mkdir -p /etc/apt/keyrings && \
     wget -q -O /etc/apt/keyrings/google-chrome.gpg https://dl.google.com/linux/linux_signing_key.pub && \
     echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
     apt-get update && \
-    apt-get install -y google-chrome-stable
+    apt-get install -y google-chrome-stable && \
+    rm -rf /var/lib/apt/lists/*  # Clean up
 
 # Install ChromeDriver using webdriver-manager (let Python handle it)
 # This is better than manual installation since it ensures version compatibility
 
 # Install Python dependencies
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
