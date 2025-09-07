@@ -27,6 +27,9 @@ from telegram.ext import (
 from webdriver_manager.chrome import ChromeDriverManager
 from collections import defaultdict
 
+import traceback
+import sys
+
 # Global dictionary to track running tasks per user
 user_tasks = defaultdict(list)
 user_stop_events = defaultdict(threading.Event)
@@ -41,6 +44,20 @@ message = 'null'
 
 url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
 
+async def send_error_to_telegram(error_message, context=None, chat_id=None):
+    """Send error messages to Telegram for debugging"""
+    try:
+        if chat_id is None:
+            chat_id = '1235697766'  # Your default chat ID
+        
+        # Truncate very long messages to avoid Telegram limits
+        if len(error_message) > 4000:
+            error_message = error_message[:4000] + "...[truncated]"
+        
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text=🚨 ERROR: {error_message}"
+        requests.get(url, timeout=10)
+    except Exception as e:
+        print(f"Failed to send error to Telegram: {e}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -132,415 +149,415 @@ def cleanup_user_task(user_id, task):
             user_stop_events.pop(user_id, None)
 
 def run_selenium(context_data, stop_event):
-    options = Options()
-
-    # Environment detection
-    is_production = os.environ.get('DYNO') or os.environ.get('KOYEB') or os.environ.get('CHROME_BIN')
-    
-    if is_production:
-        # Production settings
-        options.binary_location = os.environ.get('CHROME_BIN', '/usr/bin/google-chrome-stable')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--single-process')  # Critical for memory
-
-    options.add_argument('--headless=new')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--window-size=1920,1080')
-    options.add_argument('--disable-extensions')
-    options.add_argument('--disable-software-rasterizer')
-    options.add_argument('--disable-setuid-sandbox')
-
-    driver = None
-    max_retries = 3
-    retry_count = 0
-
-    while retry_count < max_retries and not stop_event.is_set():
-        try:
-            print(f"Attempt {retry_count + 1} to initialize ChromeDriver...")
-            
-            driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()),
-                options=options
-        )
-            
-            # Set timeouts for the driver
-            driver.set_page_load_timeout(60)  # 60 seconds for page load
-            driver.implicitly_wait(30)  # 30 seconds for element finding
-            
-            print("ChromeDriver initialized successfully")
-            break
-        except Exception as e:
-            retry_count += 1
-            print(f"ChromeDriver initialization failed (attempt {retry_count}): {e}")
-            
-            if retry_count >= max_retries:
-                print("Max retries reached, giving up")
-                return None
-                
-            print("Retrying in 5 seconds...")
-            sleep(5)
-            continue
-
-    if driver is None or stop_event.is_set():
-        print("Driver not initialized or stop requested")
-        return None
-
-
-
     try:
-        # Your scraping logic here using:
-        origin = context_data['origin']
-        dest = context_data['dest']
-        date = context_data['date']
-
-        # Check if stop was requested before starting
-        if stop_event.is_set():
-            print("Stop requested before starting scraping")
-            return None
-
-        # Example usage:
-        driver.get('https://online.ktmb.com.my')
-        sleep(3)
-
-        # Check for stop request
-        if stop_event.is_set():
-            print("Stop requested during initial page load")
-            return None
+        print("=== STARTING SCRAPING SESSION ===")
         
-        # Define XPath
-        xp_popup_close = '//button[contains(@class, "btn payment-modal-btn")]'
-
-        # Find all matching elements
-        popup_buttons = driver.find_elements(By.XPATH, xp_popup_close)
-
-        # Close ad button (Website popup)
-        # Access the specific button (index 3 for the fourth button)
-        # try:
-        #     specific_button = popup_buttons[3]  # 4th button
-        #     specific_button.click() 
-        # except IndexError:
-        #     print("Button at the specified index not found.")
-        # except Exception as e:
-        #     print("An error occurred:", e)
-
-
-
-
-
-        # Select an origin station (example: KL Sentral)
-        wait = WebDriverWait(driver, 10)
-        origin_select = wait.until(EC.presence_of_element_located((By.ID, "select2-FromStationId-container")))
-
-        origin_select.click()
-        sleep(1)  # Allow dropdown animation
-
-        # Check for stop request
-        if stop_event.is_set():
-            print("Stop requested during origin selection")
-            return None
-
-        origin_option = wait.until(EC.element_to_be_clickable((By.XPATH, f"//div[@class='station-name' and text()='{origin}']"))) # INPUT
-        origin_option.click()
-
-        # Check for stop request
-        if stop_event.is_set():
-            print("Stop requested after origin selection")
-            return None
-
-
-
-
-        dest_select = wait.until(EC.presence_of_element_located((By.ID, "select2-ToStationId-container")))
-        dest_select.click()
-        sleep(1)  # Allow dropdown animation
-
-        # Check for stop request
-        if stop_event.is_set():
-            print("Stop requested during destination selection")
-            return None
+        options = Options()
+        is_production = os.environ.get('DYNO') or os.environ.get('KOYEB') or os.environ.get('CHROME_BIN')
         
-        dest_option = wait.until(EC.element_to_be_clickable((By.XPATH, f"//div[@class='station-name' and text()='{dest}']"))) #INPUT
-        dest_option.click()
+        if is_production:
+            options.binary_location = os.environ.get('CHROME_BIN', '/usr/bin/google-chrome-stable')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--single-process')
 
-        # Check for stop request
-        if stop_event.is_set():
-            print("Stop requested after destination selection")
-            return None
+        options.add_argument('--headless=new')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--window-size=1920,1080')
 
+        driver = None
+        max_retries = 3
+        retry_count = 0
 
-
-        depart_date = wait.until(EC.presence_of_element_located((By.ID, "OnwardDate")))
-        depart_date.click()
-
-
-        # Wait until the input field is present
-        date_input = wait.until(EC.presence_of_element_located((By.ID, "OnwardDate")))
-
-        # Use JavaScript to set the value of the input field
-        driver.execute_script("arguments[0].value = arguments[1];", date_input, date)
-
-        # Optional: Trigger any JavaScript events related to the field change
-        driver.execute_script("arguments[0].dispatchEvent(new Event('change', { bubbles: true }));", date_input)
-        close_calendar = driver.find_element(By.ID,  "trainBack")
-        close_calendar.click()
-        depart_date = wait.until(EC.presence_of_element_located((By.ID, "OnwardDate")))
-        depart_date.click()
-
-        # Check for stop request
-        if stop_event.is_set():
-            print("Stop requested during date selection")
-            return None
-
-
-        # Wait for the close button to be clickable
-        close_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(@class, 'close-date-btn') and text()='X']")))
-        close_button.click()
-
-        # Check for stop request
-        if stop_event.is_set():
-            print("Stop requested after date selection")
-            return None
-
-
-        search_button = wait.until(EC.element_to_be_clickable((By.ID, "btnSubmit")))
-        search_button.click() 
-
-        # Check for stop request
-        if stop_event.is_set():
-            print("Stop requested after search")
-            return None
-        
-        TEST_MODE = False  # Set to False in production
-
-        if TEST_MODE:
-            previous_data = [{'train_service': 'Platinum - 9272', 'departure': '07:20', 'arrival': '12:02', 'seats_left': '999', 'fare': 'MYR 102.00'},
-                            {'train_service': 'Platinum - 9274', 'departure': '09:55', 'arrival': '14:37', 'seats_left': '999', 'fare': 'MYR 102.00'},
-                            {'train_service': 'Gold - 9420', 'departure': '10:41', 'arrival': '15:36', 'seats_left': '0', 'fare': 'MYR 74.00'},
-                            {'train_service': 'Express - 9206', 'departure': '18:00', 'arrival': '22:14', 'seats_left': '0', 'fare': 'MYR 114.00'},
-                            {'train_service': 'Platinum - 9278', 'departure': '22:50', 'arrival': '03:32\n                                        +1', 'seats_left': '999', 'fare': 'MYR 99.00'}]
-        else:
-            previous_data = None  # Initialize previous_data to None for production
-
-        while not stop_event.is_set():
-            # Check for stop request at the beginning of each iteration
-            if stop_event.is_set():
-                print("Stop requested at start of loop iteration")
-                break
-
-            # Wait for the table to load (adjust the timeout and conditions as needed)
+        # ChromeDriver initialization with detailed error handling
+        while retry_count < max_retries and not stop_event.is_set():
             try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, "table.bottom-0"))
-                )
-                print("Table loaded")
-            except:
-                print("Table not found within the timeout period.")
-                # Check if we should continue or break
-                if stop_event.is_set():
-                    break
-                continue
+                service = Service(ChromeDriverManager().install())
+                driver = webdriver.Chrome(service=service, options=options)
+                driver.set_page_load_timeout(120)
+                driver.implicitly_wait(60)
+                break
+                
+            except Exception as e:
+                retry_count += 1
+                error_msg = f"ChromeDriver init attempt {retry_count}: {str(e)}"
+                asyncio.run(send_error_to_telegram(error_msg))
+                if retry_count >= max_retries:
+                    raise Exception(f"Failed to initialize ChromeDriver after {max_retries} attempts: {e}")
+                sleep(5)
+
+        if driver is None or stop_event.is_set():
+            return None
+        try:
+            # Your scraping logic here using:
+            origin = context_data['origin']
+            dest = context_data['dest']
+            date = context_data['date']
+
+            # Check if stop was requested before starting
+            if stop_event.is_set():
+                print("Stop requested before starting scraping")
+                return None
+
+            # Example usage:
+            driver.get('https://online.ktmb.com.my')
+            sleep(3)
 
             # Check for stop request
             if stop_event.is_set():
-                print("Stop requested after table load")
-                break
+                print("Stop requested during initial page load")
+                return None
+            
+            # Define XPath
+            xp_popup_close = '//button[contains(@class, "btn payment-modal-btn")]'
+
+            # Find all matching elements
+            popup_buttons = driver.find_elements(By.XPATH, xp_popup_close)
+
+            # Close ad button (Website popup)
+            # Access the specific button (index 3 for the fourth button)
+            # try:
+            #     specific_button = popup_buttons[3]  # 4th button
+            #     specific_button.click() 
+            # except IndexError:
+            #     print("Button at the specified index not found.")
+            # except Exception as e:
+            #     print("An error occurred:", e)
 
 
-            # Pass it to BeautifulSoup
-            soup = BeautifulSoup(driver.page_source, 'html.parser')
-            # print(soup.prettify())
+
+
+
+            # Select an origin station (example: KL Sentral)
+            wait = WebDriverWait(driver, 10)
+            origin_select = wait.until(EC.presence_of_element_located((By.ID, "select2-FromStationId-container")))
+
+            origin_select.click()
+            sleep(1)  # Allow dropdown animation
+
+            # Check for stop request
             if stop_event.is_set():
-                print("Stop requested during parsing")
-                break
+                print("Stop requested during origin selection")
+                return None
 
-            sleep(10)
-            # Locate the table
-            table = soup.find_all("table", class_= "table bottom-0")
-            # print(len(table))
+            origin_option = wait.until(EC.element_to_be_clickable((By.XPATH, f"//div[@class='station-name' and text()='{origin}']"))) # INPUT
+            origin_option.click()
 
-                        
-            if not table or len(table) < 2:
-                print("Table not found in HTML")
+            # Check for stop request
+            if stop_event.is_set():
+                print("Stop requested after origin selection")
+                return None
+
+
+
+
+            dest_select = wait.until(EC.presence_of_element_located((By.ID, "select2-ToStationId-container")))
+            dest_select.click()
+            sleep(1)  # Allow dropdown animation
+
+            # Check for stop request
+            if stop_event.is_set():
+                print("Stop requested during destination selection")
+                return None
+            
+            dest_option = wait.until(EC.element_to_be_clickable((By.XPATH, f"//div[@class='station-name' and text()='{dest}']"))) #INPUT
+            dest_option.click()
+
+            # Check for stop request
+            if stop_event.is_set():
+                print("Stop requested after destination selection")
+                return None
+
+
+
+            depart_date = wait.until(EC.presence_of_element_located((By.ID, "OnwardDate")))
+            depart_date.click()
+
+
+            # Wait until the input field is present
+            date_input = wait.until(EC.presence_of_element_located((By.ID, "OnwardDate")))
+
+            # Use JavaScript to set the value of the input field
+            driver.execute_script("arguments[0].value = arguments[1];", date_input, date)
+
+            # Optional: Trigger any JavaScript events related to the field change
+            driver.execute_script("arguments[0].dispatchEvent(new Event('change', { bubbles: true }));", date_input)
+            close_calendar = driver.find_element(By.ID,  "trainBack")
+            close_calendar.click()
+            depart_date = wait.until(EC.presence_of_element_located((By.ID, "OnwardDate")))
+            depart_date.click()
+
+            # Check for stop request
+            if stop_event.is_set():
+                print("Stop requested during date selection")
+                return None
+
+
+            # Wait for the close button to be clickable
+            close_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(@class, 'close-date-btn') and text()='X']")))
+            close_button.click()
+
+            # Check for stop request
+            if stop_event.is_set():
+                print("Stop requested after date selection")
+                return None
+
+
+            search_button = wait.until(EC.element_to_be_clickable((By.ID, "btnSubmit")))
+            search_button.click() 
+
+            # Check for stop request
+            if stop_event.is_set():
+                print("Stop requested after search")
+                return None
+            
+            TEST_MODE = False  # Set to False in production
+
+            if TEST_MODE:
+                previous_data = [{'train_service': 'Platinum - 9272', 'departure': '07:20', 'arrival': '12:02', 'seats_left': '999', 'fare': 'MYR 102.00'},
+                                {'train_service': 'Platinum - 9274', 'departure': '09:55', 'arrival': '14:37', 'seats_left': '999', 'fare': 'MYR 102.00'},
+                                {'train_service': 'Gold - 9420', 'departure': '10:41', 'arrival': '15:36', 'seats_left': '0', 'fare': 'MYR 74.00'},
+                                {'train_service': 'Express - 9206', 'departure': '18:00', 'arrival': '22:14', 'seats_left': '0', 'fare': 'MYR 114.00'},
+                                {'train_service': 'Platinum - 9278', 'departure': '22:50', 'arrival': '03:32\n                                        +1', 'seats_left': '999', 'fare': 'MYR 99.00'}]
+            else:
+                previous_data = None  # Initialize previous_data to None for production
+
+            while not stop_event.is_set():
+                # Check for stop request at the beginning of each iteration
                 if stop_event.is_set():
+                    print("Stop requested at start of loop iteration")
                     break
-                sleep(5)
-                continue
 
-            target_table = table[1]
-            # print(target_table)
+                # Wait for the table to load (adjust the timeout and conditions as needed)
+                try:
+                    WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.CLASS_NAME, "table.bottom-0"))
+                    )
+                    print("Table loaded")
+                except:
+                    print("Table not found within the timeout period.")
+                    # Check if we should continue or break
+                    if stop_event.is_set():
+                        break
+                    continue
 
-            rows = target_table.find_all('tr')
-            # print(rows)
+                # Check for stop request
+                if stop_event.is_set():
+                    print("Stop requested after table load")
+                    break
 
-            # Extract and store in a structured format
-            train_data = []
-            try:
-                tbody = target_table.find("tbody")
-                if not tbody:
-                    print("No tbody found in table")
+
+                # Pass it to BeautifulSoup
+                soup = BeautifulSoup(driver.page_source, 'html.parser')
+                # print(soup.prettify())
+                if stop_event.is_set():
+                    print("Stop requested during parsing")
+                    break
+
+                sleep(10)
+                # Locate the table
+                table = soup.find_all("table", class_= "table bottom-0")
+                # print(len(table))
+
+                            
+                if not table or len(table) < 2:
+                    print("Table not found in HTML")
+                    if stop_event.is_set():
+                        break
+                    sleep(5)
+                    continue
+
+                target_table = table[1]
+                # print(target_table)
+
+                rows = target_table.find_all('tr')
+                # print(rows)
+
+                # Extract and store in a structured format
+                train_data = []
+                try:
+                    tbody = target_table.find("tbody")
+                    if not tbody:
+                        print("No tbody found in table")
+                        if stop_event.is_set():
+                            break
+                        sleep(5)
+                        continue
+                    
+                    for row in target_table.find("tbody").find_all("tr"):
+                        cells = row.find_all("td")
+                        train_data.append({
+                            "train_service": cells[0].text.strip(),
+                            "departure": cells[1].text.strip(),
+                            "arrival": cells[2].text.strip(),
+                            "seats_left": cells[4].text.strip(),
+                            "fare": cells[5].text.strip()
+                        })
+                except Exception as e:
+                    print(f"Error parsing table: {e}")
                     if stop_event.is_set():
                         break
                     sleep(5)
                     continue
                 
-                for row in target_table.find("tbody").find_all("tr"):
-                    cells = row.find_all("td")
-                    train_data.append({
-                        "train_service": cells[0].text.strip(),
-                        "departure": cells[1].text.strip(),
-                        "arrival": cells[2].text.strip(),
-                        "seats_left": cells[4].text.strip(),
-                        "fare": cells[5].text.strip()
-                    })
-            except Exception as e:
-                print(f"Error parsing table: {e}")
+                # Check for stop request
                 if stop_event.is_set():
+                    print("Stop requested after data extraction")
                     break
-                sleep(5)
-                continue
-            
-            # Check for stop request
-            if stop_event.is_set():
-                print("Stop requested after data extraction")
-                break
 
-            # Print structured data
-            for train in train_data:
-                print(train)
-                # Send data to Telegram for first scrape only
+                # Print structured data
+                for train in train_data:
+                    print(train)
+                    # Send data to Telegram for first scrape only
+                    if previous_data is None:
+                        message = f"🚆 Train Service: {train['train_service']}\n" \
+                                f"🕒 Departure: {train['departure']}\n" \
+                                f"🕒 Arrival: {train['arrival']}\n" \
+                                f"💺 Seats Left: {train['seats_left']}\n" \
+                                f"💰 Fare: {train['fare']}"
+                        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
+                        r = requests.get(url)
                 if previous_data is None:
-                    message = f"🚆 Train Service: {train['train_service']}\n" \
-                            f"🕒 Departure: {train['departure']}\n" \
-                            f"🕒 Arrival: {train['arrival']}\n" \
-                            f"💺 Seats Left: {train['seats_left']}\n" \
-                            f"💰 Fare: {train['fare']}"
+                    message = f"Now checking for changes in seats left for {origin} to {dest} on {date}..."
                     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
                     r = requests.get(url)
-            if previous_data is None:
-                message = f"Now checking for changes in seats left for {origin} to {dest} on {date}..."
-                url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
-                r = requests.get(url)
-            
-            # file_name = f"train_data_{origin}_to_{dest}_{date}.json"
-            # file_path = os.path.join(os.getcwd(), file_name)
-            
-            # # compare and notify
-
-            # if os.path.exists(file_path):
-            #     # Load previous data
-            #     with open(file_path, "r") as file:
-            #         previous_data = json.load(file)
                 
-            #     # Compare new data with previous data
-            #     if train_data != previous_data:
-            #         print("Data has changed")
-            #         for i in range(len(train_data)):
-            #             if train_data[i]['seats_left'] != previous_data[i]['seats_left']:
-            #                 message = 'Seats number changed for ' + train_data[i]['train_service'] + ' departing at ' + train_data[i]['departure']
-            #                 url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
-            #                 r = requests.get(url)
-            #                 print(r.json())
+                # file_name = f"train_data_{origin}_to_{dest}_{date}.json"
+                # file_path = os.path.join(os.getcwd(), file_name)
+                
+                # # compare and notify
+
+                # if os.path.exists(file_path):
+                #     # Load previous data
+                #     with open(file_path, "r") as file:
+                #         previous_data = json.load(file)
+                    
+                #     # Compare new data with previous data
+                #     if train_data != previous_data:
+                #         print("Data has changed")
+                #         for i in range(len(train_data)):
+                #             if train_data[i]['seats_left'] != previous_data[i]['seats_left']:
+                #                 message = 'Seats number changed for ' + train_data[i]['train_service'] + ' departing at ' + train_data[i]['departure']
+                #                 url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
+                #                 r = requests.get(url)
+                #                 print(r.json())
+                            
+                #         # Save the new data
+                #         with open(file_path, "w") as file:
+                #             json.dump(train_data, file, indent=4)
+                #     else:
+                #         print("No changes detected")
+                # else:
+                #     # File doesn't exist; save new data
+                #     with open(file_path, "w") as file:
+                #         json.dump(train_data, file, indent=4)
+                #     print("Data saved for the first time")
+                def compare_data(train_data, previous_data, TOKEN, chat_id):
+                    """Compare current data with previous data and send notifications for changes"""
+                    if previous_data is None:
+                        return
                         
-            #         # Save the new data
-            #         with open(file_path, "w") as file:
-            #             json.dump(train_data, file, indent=4)
-            #     else:
-            #         print("No changes detected")
-            # else:
-            #     # File doesn't exist; save new data
-            #     with open(file_path, "w") as file:
-            #         json.dump(train_data, file, indent=4)
-            #     print("Data saved for the first time")
-            def compare_data(train_data, previous_data, TOKEN, chat_id):
-                """Compare current data with previous data and send notifications for changes"""
-                if previous_data is None:
-                    return
-                    
-                if train_data != previous_data:
-                    print("Data has changed")
-                    # Make sure we're comparing the same trains
-                    min_length = min(len(train_data), len(previous_data))
-                    
-                    for i in range(min_length):
-                        try:
-                            # Extract numeric values from seat strings (e.g., "10" from "10 seats")
-                            current_seats = ''.join(filter(str.isdigit, train_data[i]['seats_left']))
-                            previous_seats = ''.join(filter(str.isdigit, previous_data[i]['seats_left']))
-                            
-                            current_seats = int(current_seats) if current_seats else 0
-                            previous_seats = int(previous_seats) if previous_seats else 0
-                            
-                            if current_seats < previous_seats:
-                                message = f'😱 Seats left decreased\n{current_seats} seats left for {train_data[i]["train_service"]} departing at {train_data[i]["departure"]}'
-                                url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
-                                requests.get(url, timeout=5)
-                            elif current_seats > previous_seats:
-                                message = f'😍 Seats left increased\n{current_seats} seats left for {train_data[i]["train_service"]} departing at {train_data[i]["departure"]}'
-                                url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
-                                requests.get(url, timeout=5)
-                        except Exception as e:
-                            print(f"Error comparing train data: {e}")
+                    if train_data != previous_data:
+                        print("Data has changed")
+                        # Make sure we're comparing the same trains
+                        min_length = min(len(train_data), len(previous_data))
+                        
+                        for i in range(min_length):
+                            try:
+                                # Extract numeric values from seat strings (e.g., "10" from "10 seats")
+                                current_seats = ''.join(filter(str.isdigit, train_data[i]['seats_left']))
+                                previous_seats = ''.join(filter(str.isdigit, previous_data[i]['seats_left']))
+                                
+                                current_seats = int(current_seats) if current_seats else 0
+                                previous_seats = int(previous_seats) if previous_seats else 0
+                                
+                                if current_seats < previous_seats:
+                                    message = f'😱 Seats left decreased\n{current_seats} seats left for {train_data[i]["train_service"]} departing at {train_data[i]["departure"]}'
+                                    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
+                                    requests.get(url, timeout=5)
+                                elif current_seats > previous_seats:
+                                    message = f'😍 Seats left increased\n{current_seats} seats left for {train_data[i]["train_service"]} departing at {train_data[i]["departure"]}'
+                                    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
+                                    requests.get(url, timeout=5)
+                            except Exception as e:
+                                print(f"Error comparing train data: {e}")
 
-            compare_data(train_data, previous_data, TOKEN, chat_id)
-            # Save the new data in memory
-            previous_data = train_data
-            if stop_event.is_set():
-                print("Stop requested before refresh")
-                break
-
-            # Wait with periodic stop checks instead of a long sleep
-            for _ in range(20):  # Check every 0.5 seconds for 10 seconds total
+                compare_data(train_data, previous_data, TOKEN, chat_id)
+                # Save the new data in memory
+                previous_data = train_data
                 if stop_event.is_set():
-                    print("Stop requested during wait")
+                    print("Stop requested before refresh")
                     break
-                sleep(0.5)
-            
-            if stop_event.is_set():
-                break
 
-            sleep(10) 
-            driver.refresh()
-        print("Scraping loop ended")
-        return {"status": "completed", "data": previous_data} if previous_data else {"status": "stopped"}            
+                # Wait with periodic stop checks instead of a long sleep
+                for _ in range(20):  # Check every 0.5 seconds for 10 seconds total
+                    if stop_event.is_set():
+                        print("Stop requested during wait")
+                        break
+                    sleep(0.5)
+                
+                if stop_event.is_set():
+                    break
+
+                sleep(10) 
+                driver.refresh()
+            print("Scraping loop ended")
+            return {"status": "completed", "data": previous_data} if previous_data else {"status": "stopped"}            
+                # Main scraping logic with detailed error handling
+            return perform_scraping(driver, context_data, stop_event)
+        
+        except Exception as e:
+            print(f"Selenium error: {str(e)}")
+        finally:
+            driver.quit()
             
     except Exception as e:
-        print(f"Selenium error: {str(e)}")
+        error_msg = f"run_selenium failed: {str(e)}\nTraceback: {traceback.format_exc()}"
+        asyncio.run(send_error_to_telegram(error_msg))
+        return None
     finally:
-        driver.quit()
+        if driver:
+            try:
+                driver.quit()
+            except Exception as e:
+                asyncio.run(send_error_to_telegram(f"Error quitting driver: {e}"))        
 
 async def start_scraping(update: Update, context: ContextTypes.DEFAULT_TYPE, stop_event: threading.Event):
     user_id = update.message.from_user.id
+    chat_id = update.effective_chat.id
     
     try:
-        # Run selenium in a thread pool to avoid blocking the event loop
+        # Send start notification
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="🔄 Starting scraping process..."
+        )
+
+        # Run scraping with timeout
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None, 
-            lambda: run_selenium(context.user_data, stop_event)
+        result = await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: run_selenium(context.user_data, stop_event)),
+            timeout=300  # 5 minute timeout
         )
         
         if stop_event.is_set():
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="Scraping was cancelled by user request."
-            )
+            await context.bot.send_message(chat_id=chat_id, text="⏹️ Scraping cancelled by user")
+        elif result is None:
+            await context.bot.send_message(chat_id=chat_id, text="❌ Scraping failed - no results")
         else:
-            # Process and send results
             await process_and_send_results(update, context, result)
             
+    except asyncio.TimeoutError:
+        error_msg = "Scraping timed out after 5 minutes"
+        await send_error_to_telegram(error_msg, chat_id=chat_id)
+        await context.bot.send_message(chat_id=chat_id, text="⏰ Scraping timed out")
     except asyncio.CancelledError:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Scraping was cancelled."
-        )
+        await context.bot.send_message(chat_id=chat_id, text="⏹️ Scraping cancelled")
     except Exception as e:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"An error occurred during scraping: {str(e)}"
-        )
+        error_msg = f"Unexpected error: {str(e)}\n{traceback.format_exc()}"
+        await send_error_to_telegram(error_msg, chat_id=chat_id)
+        await context.bot.send_message(chat_id=chat_id, text="❌ Unexpected error during scraping")
     finally:
-        # Clean up
         cleanup_user_task(user_id, asyncio.current_task())
 
 # async def stop_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
