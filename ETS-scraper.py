@@ -46,7 +46,7 @@ url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={
 
 def check_koyeb_environment():
     """Check if we're running on Koyeb and verify environment setup"""
-    is_koyeb = os.environ.get('koyeb') is None
+    is_koyeb = os.environ.get('koyeb') is not None
     
     if not is_koyeb:
         return "✅ Running locally - environment checks skipped"
@@ -222,7 +222,7 @@ def cleanup_user_task(user_id, task):
 
 def run_selenium(context_data, stop_event):
     try:
-        is_koyeb = os.environ.get('KOYEB' or 'Koyeb' or 'koyeb') is None
+        is_koyeb = os.environ.get('KOYEB' or 'Koyeb' or 'koyeb') is not None
         
         if is_koyeb:
             # Koyeb-specific initialization
@@ -631,7 +631,7 @@ def run_selenium(context_data, stop_event):
 async def start_scraping(update: Update, context: ContextTypes.DEFAULT_TYPE, stop_event: threading.Event):
     user_id = update.message.from_user.id
     chat_id = update.effective_chat.id
-    is_koyeb = os.environ.get('KOYEB') is None
+    is_koyeb = os.environ.get('KOYEB') is not None
     
     try:
         if is_koyeb:
