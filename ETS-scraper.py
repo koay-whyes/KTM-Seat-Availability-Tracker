@@ -143,10 +143,42 @@ def run_selenium(context_data, stop_event):
     options.add_argument('--window-size=1920,1080')
     options.add_argument('--no-zygote')
 
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=options
-    )
+    driver = None
+    max_retries = 3
+    retry_count = 0
+
+    while retry_count < max_retries and not stop_event.is_set():
+        try:
+            print(f"Attempt {retry_count + 1} to initialize ChromeDriver...")
+            
+            driver = webdriver.Chrome(
+                service=Service(ChromeDriverManager().install()),
+                options=options
+        )
+            
+            # Set timeouts for the driver
+            driver.set_page_load_timeout(60)  # 60 seconds for page load
+            driver.implicitly_wait(30)  # 30 seconds for element finding
+            
+            print("ChromeDriver initialized successfully")
+            break
+        except Exception as e:
+            retry_count += 1
+            print(f"ChromeDriver initialization failed (attempt {retry_count}): {e}")
+            
+            if retry_count >= max_retries:
+                print("Max retries reached, giving up")
+                return None
+                
+            print("Retrying in 5 seconds...")
+            sleep(5)
+            continue
+
+    if driver is None or stop_event.is_set():
+        print("Driver not initialized or stop requested")
+        return None
+
+
 
     try:
         # Your scraping logic here using:
@@ -314,7 +346,7 @@ def run_selenium(context_data, stop_event):
                 print("Stop requested during parsing")
                 break
 
-            sleep(5)
+            sleep(10)
             # Locate the table
             table = soup.find_all("table", class_= "table bottom-0")
             # print(len(table))
