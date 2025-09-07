@@ -46,7 +46,7 @@ url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={
 
 def check_koyeb_environment():
     """Check if we're running on Koyeb and verify environment setup"""
-    is_koyeb = os.environ.get('koyeb') is not None
+    is_koyeb = os.environ.get('koyeb') is None
     
     if not is_koyeb:
         return "✅ Running locally - environment checks skipped"
@@ -101,7 +101,7 @@ def check_koyeb_environment():
 
 async def verify_environment():
     """Run environment checks and report to Telegram if on Koyeb"""
-    if os.environ.get('KOYEB') or os.environ.get('koyeb') or os.environ.get('KOYEB_APP') or os.environ.get('KOYEB_SERVICE'):
+    if os.environ.get('KOYEB' or 'Koyeb' or 'koyeb'):
         environment_report = check_koyeb_environment()
         await send_to_telegram(f"Environment Check:\n{environment_report}", is_error=False)
 
@@ -222,8 +222,8 @@ def cleanup_user_task(user_id, task):
 
 def run_selenium(context_data, stop_event):
     try:
-        is_koyeb = os.environ.get('KOYEB') is not None or os.environ.get('koyeb') is not None or os.environ.get('KOYEB_APP') is not None or os.environ.get('KOYEB_SERVICE') is not None
-
+        is_koyeb = os.environ.get('KOYEB' or 'Koyeb' or 'koyeb') is None
+        
         if is_koyeb:
             # Koyeb-specific initialization
             asyncio.run(send_to_telegram("🚀 Starting scraping on Koyeb", is_error=False))
@@ -240,7 +240,7 @@ def run_selenium(context_data, stop_event):
         print("=== STARTING SCRAPING SESSION ===")
         
         options = Options()
-        is_production = os.environ.get('DYNO') or os.environ.get('KOYEB') or os.environ.get('koyeb') or os.environ.get('KOYEB_APP') or os.environ.get('KOYEB_SERVICE') or os.environ.get('CHROME_BIN')
+        is_production = os.environ.get('DYNO') or os.environ.get('KOYEB' or 'Koyeb' or 'koyeb') or os.environ.get('CHROME_BIN')
         
         if is_production:
             options.binary_location = os.environ.get('CHROME_BIN', '/usr/bin/google-chrome-stable')
@@ -631,8 +631,8 @@ def run_selenium(context_data, stop_event):
 async def start_scraping(update: Update, context: ContextTypes.DEFAULT_TYPE, stop_event: threading.Event):
     user_id = update.message.from_user.id
     chat_id = update.effective_chat.id
-    is_koyeb = os.environ.get('KOYEB') is not None or os.environ.get('koyeb') is not None or os.environ.get('KOYEB_APP') is not None or os.environ.get('KOYEB_SERVICE') is not None
-
+    is_koyeb = os.environ.get('KOYEB') is None
+    
     try:
         if is_koyeb:
             await context.bot.send_message(chat_id=chat_id, text="🔄 Starting scraping on Koyeb...")
