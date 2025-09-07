@@ -631,38 +631,53 @@ def run_selenium(context_data, stop_event):
 async def start_scraping(update: Update, context: ContextTypes.DEFAULT_TYPE, stop_event: threading.Event):
     user_id = update.message.from_user.id
     chat_id = update.effective_chat.id
+    is_koyeb = os.environ.get('KOYEB') is not None
     
     try:
-        # Send start notification
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="🔄 Starting scraping process..."
-        )
+        if is_koyeb:
+            await context.bot.send_message(chat_id=chat_id, text="🔄 Starting scraping on Koyeb...")
+            # Run environment verification
+            await verify_environment()
+        else:
+            await context.bot.send_message(chat_id=chat_id, text="🔄 Starting scraping process...")
 
-        # Run scraping with timeout
+        # Adjust timeout based on environment
+        timeout = 600 if is_koyeb else 300  # 10 minutes for Koyeb, 5 for local
+
         loop = asyncio.get_event_loop()
         result = await asyncio.wait_for(
             loop.run_in_executor(None, lambda: run_selenium(context.user_data, stop_event)),
-            timeout=300  # 5 minute timeout
+            timeout=timeout
         )
         
         if stop_event.is_set():
             await context.bot.send_message(chat_id=chat_id, text="⏹️ Scraping cancelled by user")
-        elif result is None:
-            await context.bot.send_message(chat_id=chat_id, text="❌ Scraping failed - no results")
+            return
+            
+        if result is None:
+            error_msg = "Scraping returned no results - likely failed during execution"
+            if is_koyeb:
+                await send_error_to_telegram(error_msg, chat_id=chat_id)
+            await context.bot.send_message(chat_id=chat_id, text="❌ Scraping failed - no results obtained")
         else:
             await process_and_send_results(update, context, result)
             
     except asyncio.TimeoutError:
-        error_msg = "Scraping timed out after 5 minutes"
-        await send_error_to_telegram(error_msg, chat_id=chat_id)
+        error_msg = f"Scraping timed out after {'10' if is_koyeb else '5'} minutes"
+        if is_koyeb:
+            await send_error_to_telegram(error_msg, chat_id=chat_id)
         await context.bot.send_message(chat_id=chat_id, text="⏰ Scraping timed out")
+        
     except asyncio.CancelledError:
         await context.bot.send_message(chat_id=chat_id, text="⏹️ Scraping cancelled")
+        
     except Exception as e:
-        error_msg = f"Unexpected error: {str(e)}\n{traceback.format_exc()}"
-        await send_error_to_telegram(error_msg, chat_id=chat_id)
+        error_msg = f"Unexpected error: {str(e)}"
+        if is_koyeb:
+            await send_error_to_telegram(error_msg, chat_id=chat_id)
+            await send_error_to_telegram(f"Traceback: {traceback.format_exc()}", chat_id=chat_id)
         await context.bot.send_message(chat_id=chat_id, text="❌ Unexpected error during scraping")
+        
     finally:
         cleanup_user_task(user_id, asyncio.current_task())
 
