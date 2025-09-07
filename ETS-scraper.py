@@ -44,6 +44,67 @@ message = 'null'
 
 url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
 
+def check_koyeb_environment():
+    """Check if we're running on Koyeb and verify environment setup"""
+    is_koyeb = os.environ.get('KOYEB') is not None
+    
+    if not is_koyeb:
+        return "✅ Running locally - environment checks skipped"
+    
+    checks = []
+    
+    # Check Chrome installation
+    chrome_paths = [
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/google-chrome',
+        '/app/.apt/usr/bin/google-chrome'
+    ]
+    
+    chrome_found = False
+    for path in chrome_paths:
+        if os.path.exists(path):
+            chrome_found = True
+            checks.append(f"✅ Chrome found at: {path}")
+            break
+    
+    if not chrome_found:
+        checks.append("❌ Chrome not found in expected locations")
+    
+    # Check critical dependencies
+    dependencies = [
+        ('/usr/bin/wget', 'wget'),
+        ('/usr/bin/curl', 'curl'),
+        ('/usr/bin/unzip', 'unzip')
+    ]
+    
+    for path, name in dependencies:
+        if os.path.exists(path):
+            checks.append(f"✅ {name} found")
+        else:
+            checks.append(f"❌ {name} not found")
+    
+    # Check memory constraints
+    try:
+        import psutil
+        memory = psutil.virtual_memory()
+        checks.append(f"✅ Memory: {memory.percent}% used, {memory.available//1024//1024}MB available")
+        
+        if memory.percent > 85:
+            checks.append("⚠️  High memory usage detected - consider optimizing")
+            
+    except ImportError:
+        checks.append("ℹ️  psutil not available for memory monitoring")
+    except Exception as e:
+        checks.append(f"ℹ️  Memory check failed: {e}")
+    
+    return "\n".join(checks)
+
+async def verify_environment():
+    """Run environment checks and report to Telegram if on Koyeb"""
+    if os.environ.get('KOYEB'):
+        environment_report = check_koyeb_environment()
+        await send_to_telegram(f"Environment Check:\n{environment_report}", is_error=False)
+
 async def send_to_telegram(message, chat_id=None, is_error=False):
     """Send messages to Telegram for debugging - separate error vs success"""
     try:
@@ -161,6 +222,21 @@ def cleanup_user_task(user_id, task):
 
 def run_selenium(context_data, stop_event):
     try:
+        is_koyeb = os.environ.get('KOYEB') is not None
+        
+        if is_koyeb:
+            # Koyeb-specific initialization
+            asyncio.run(send_to_telegram("🚀 Starting scraping on Koyeb", is_error=False))
+            
+            # Check resource availability before starting
+            try:
+                import psutil
+                memory = psutil.virtual_memory()
+                if memory.percent > 90:
+                    asyncio.run(send_error_to_telegram(f"High memory pressure: {memory.percent}%"))
+                    return None
+            except:
+                pass  # Skip if psutil not available
         print("=== STARTING SCRAPING SESSION ===")
         
         options = Options()
@@ -183,21 +259,34 @@ def run_selenium(context_data, stop_event):
         # ChromeDriver initialization with detailed error handling
         while retry_count < max_retries and not stop_event.is_set():
             try:
+                if is_koyeb and retry_count > 0:
+                    asyncio.run(send_to_telegram(f"Retry {retry_count}/{max_retries}", is_error=False))
                 service = Service(ChromeDriverManager().install())
                 driver = webdriver.Chrome(service=service, options=options)
                 driver.set_page_load_timeout(120)
                 driver.implicitly_wait(60)
+
+                if is_koyeb:
+                    asyncio.run(send_to_telegram("✅ ChromeDriver initialized on Koyeb", is_error=False))
                 break
                 
             except Exception as e:
                 retry_count += 1
                 error_msg = f"ChromeDriver init attempt {retry_count}: {str(e)}"
-                asyncio.run(send_error_to_telegram(error_msg))
+                
+                if is_koyeb:
+                    asyncio.run(send_error_to_telegram(error_msg))
+                
                 if retry_count >= max_retries:
+                    if is_koyeb:
+                        asyncio.run(send_error_to_telegram("❌ ChromeDriver failed after all retries"))
                     raise Exception(f"Failed to initialize ChromeDriver after {max_retries} attempts: {e}")
-                sleep(5)
+                
+                sleep(10 if is_koyeb else 5)  # Longer sleep on Koyeb
 
         if driver is None or stop_event.is_set():
+            if is_koyeb:
+                asyncio.run(send_to_telegram("Scraping cancelled before starting", is_error=False))
             return None
         try:
             # Your scraping logic here using:
