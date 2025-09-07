@@ -44,20 +44,31 @@ message = 'null'
 
 url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
 
-async def send_error_to_telegram(error_message, context=None, chat_id=None):
-    """Send error messages to Telegram for debugging"""
+async def send_to_telegram(message, chat_id=None, is_error=False):
+    """Send messages to Telegram for debugging - separate error vs success"""
     try:
         if chat_id is None:
             chat_id = '1235697766'  # Your default chat ID
         
-        # Truncate very long messages to avoid Telegram limits
-        if len(error_message) > 4000:
-            error_message = error_message[:4000] + "...[truncated]"
+        # Truncate very long messages
+        if len(message) > 4000:
+            message = message[:4000] + "...[truncated]"
         
-        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text=🚨 ERROR: {error_message}"
+        # Add appropriate prefix
+        if is_error:
+            prefix = "🚨 ERROR: "
+        else:
+            prefix = "✅ STATUS: "
+        
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={prefix}{message}"
         requests.get(url, timeout=10)
     except Exception as e:
-        print(f"Failed to send error to Telegram: {e}")
+        print(f"Failed to send message to Telegram: {e}")
+
+# Keep the old function for backward compatibility but fix it
+async def send_error_to_telegram(error_message, context=None, chat_id=None):
+    """Send only error messages to Telegram"""
+    await send_to_telegram(error_message, chat_id, is_error=True)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -199,9 +210,14 @@ def run_selenium(context_data, stop_event):
                 print("Stop requested before starting scraping")
                 return None
 
-            # Example usage:
-            driver.get('https://online.ktmb.com.my')
-            sleep(3)
+            try:
+                driver.get('https://online.ktmb.com.my')
+                WebDriverWait(driver, 30).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "body"))
+                )
+                asyncio.run(send_to_telegram("Page loaded successfully", is_error=False))
+            except Exception as e:
+                raise Exception(f"Failed to load page: {e}")
 
             # Check for stop request
             if stop_event.is_set():
@@ -223,88 +239,89 @@ def run_selenium(context_data, stop_event):
             #     print("Button at the specified index not found.")
             # except Exception as e:
             #     print("An error occurred:", e)
-
-
-
-
-
+            
             # Select an origin station (example: KL Sentral)
             wait = WebDriverWait(driver, 10)
-            origin_select = wait.until(EC.presence_of_element_located((By.ID, "select2-FromStationId-container")))
 
-            origin_select.click()
-            sleep(1)  # Allow dropdown animation
+            try:
+                origin_select = WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((By.ID, "select2-FromStationId-container"))
+                )
+                origin_select.click()
+                sleep(1)
+                
+                origin_option = WebDriverWait(driver, 20).until(
+                    EC.element_to_be_clickable((By.XPATH, f"//div[@class='station-name' and text()='{origin}']"))
+                )
+                origin_option.click()
+                asyncio.run(send_to_telegram("Origin selected", is_error=False))
+            except Exception as e:
+                raise Exception(f"Failed to select origin '{origin}': {e}")
 
-            # Check for stop request
-            if stop_event.is_set():
-                print("Stop requested during origin selection")
-                return None
-
-            origin_option = wait.until(EC.element_to_be_clickable((By.XPATH, f"//div[@class='station-name' and text()='{origin}']"))) # INPUT
-            origin_option.click()
 
             # Check for stop request
             if stop_event.is_set():
                 print("Stop requested after origin selection")
                 return None
 
-
-
-
-            dest_select = wait.until(EC.presence_of_element_located((By.ID, "select2-ToStationId-container")))
-            dest_select.click()
-            sleep(1)  # Allow dropdown animation
-
-            # Check for stop request
-            if stop_event.is_set():
-                print("Stop requested during destination selection")
-                return None
-            
-            dest_option = wait.until(EC.element_to_be_clickable((By.XPATH, f"//div[@class='station-name' and text()='{dest}']"))) #INPUT
-            dest_option.click()
+            try:
+                dest_select = WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((By.ID, "select2-ToStationId-container"))
+                )
+                dest_select.click()
+                sleep(1)
+                
+                dest_option = WebDriverWait(driver, 20).until(
+                    EC.element_to_be_clickable((By.XPATH, f"//div[@class='station-name' and text()='{dest}']"))
+                )
+                dest_option.click()
+                asyncio.run(send_to_telegram("Destination selected", is_error=False))
+            except Exception as e:
+                raise Exception(f"Failed to select destination '{dest}': {e}")
 
             # Check for stop request
             if stop_event.is_set():
                 print("Stop requested after destination selection")
                 return None
 
+            try:
+                depart_date = WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((By.ID, "OnwardDate"))
+                )
+                depart_date.click()
+                
+                date_input = WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((By.ID, "OnwardDate"))
+                )
+                driver.execute_script("arguments[0].value = arguments[1];", date_input, date)
 
-
-            depart_date = wait.until(EC.presence_of_element_located((By.ID, "OnwardDate")))
-            depart_date.click()
-
-
-            # Wait until the input field is present
-            date_input = wait.until(EC.presence_of_element_located((By.ID, "OnwardDate")))
-
-            # Use JavaScript to set the value of the input field
-            driver.execute_script("arguments[0].value = arguments[1];", date_input, date)
-
-            # Optional: Trigger any JavaScript events related to the field change
-            driver.execute_script("arguments[0].dispatchEvent(new Event('change', { bubbles: true }));", date_input)
-            close_calendar = driver.find_element(By.ID,  "trainBack")
-            close_calendar.click()
-            depart_date = wait.until(EC.presence_of_element_located((By.ID, "OnwardDate")))
-            depart_date.click()
-
-            # Check for stop request
-            if stop_event.is_set():
-                print("Stop requested during date selection")
-                return None
-
-
-            # Wait for the close button to be clickable
-            close_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(@class, 'close-date-btn') and text()='X']")))
-            close_button.click()
+                # Optional: Trigger any JavaScript events related to the field change
+                driver.execute_script("arguments[0].dispatchEvent(new Event('change', { bubbles: true }));", date_input)
+                close_calendar = driver.find_element(By.ID,  "trainBack")
+                close_calendar.click()
+                depart_date = wait.until(EC.presence_of_element_located((By.ID, "OnwardDate")))
+                depart_date.click()                
+                close_button = WebDriverWait(driver, 20).until(
+                    EC.element_to_be_clickable((By.XPATH, "//a[contains(@class, 'close-date-btn') and text()='X']"))
+                )
+                close_button.click()
+                asyncio.run(send_to_telegram("Date set", is_error=False))
+            except Exception as e:
+                raise Exception(f"Failed to set date '{date}': {e}")
 
             # Check for stop request
             if stop_event.is_set():
                 print("Stop requested after date selection")
                 return None
 
-
-            search_button = wait.until(EC.element_to_be_clickable((By.ID, "btnSubmit")))
-            search_button.click() 
+            try:
+                search_button = WebDriverWait(driver, 20).until(
+                    EC.element_to_be_clickable((By.ID, "btnSubmit"))
+                )
+                search_button.click()
+                asyncio.run(send_to_telegram("Search initiated", is_error=False))
+            except Exception as e:
+                raise Exception(f"Failed to click search button: {e}") 
 
             # Check for stop request
             if stop_event.is_set():
