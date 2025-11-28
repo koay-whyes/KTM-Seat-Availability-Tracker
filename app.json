@@ -1,0 +1,28 @@
+{
+  "name": "KTM Seat Availability Tracker",
+  "description": "A Telegram bot that tracks KTM train seat availability",
+  "buildpacks": [
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-apt"
+    },
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-google-chrome"
+    },
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-chromedriver"
+    },
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "env": {
+    "CHROME_BIN": {
+      "description": "Path to Chrome binary",
+      "value": "/app/.apt/usr/bin/google-chrome"
+    },
+    "CHROMEDRIVER_PATH": {
+      "description": "Path to ChromeDriver binary",
+      "value": "/app/.chromedriver/bin/chromedriver"
+    }
+  }
+}
