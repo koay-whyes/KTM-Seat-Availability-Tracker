@@ -254,20 +254,39 @@ def run_selenium(context_data, stop_event):
                 else:
                     asyncio.run(send_to_telegram("No Chrome-related env vars found", is_error=False))
 
-                # Debug: Check what's in /app/.apt/usr/bin/
-                try:
-                    if os.path.exists('/app/.apt/usr/bin/'):
-                        files = os.listdir('/app/.apt/usr/bin/')
-                        chrome_files = [f for f in files if 'chrome' in f.lower() or 'google' in f.lower()]
-                        asyncio.run(send_to_telegram(f"Chrome files in /app/.apt/usr/bin/: {chrome_files}", is_error=False))
-                except Exception as e:
-                    asyncio.run(send_to_telegram(f"Error checking /app/.apt/usr/bin/: {e}", is_error=False))
+                # Debug: Check chrome-for-testing directory
+                chrome_test_dirs = [
+                    '/app/.chrome-for-testing',
+                    '/app/.chrome-for-testing/chrome-linux64',
+                    '/app/.chrome',
+                    '/app/.chromedriver'
+                ]
+                for dir_path in chrome_test_dirs:
+                    try:
+                        if os.path.exists(dir_path):
+                            files = os.listdir(dir_path)
+                            asyncio.run(send_to_telegram(f"Found {dir_path}: {files[:5]}", is_error=False))
+                    except Exception as e:
+                        pass
+
+                # Check for chrome binary specifically
+                possible_chrome_bins = [
+                    '/app/.chrome-for-testing/chrome-linux64/chrome',
+                    '/app/.chrome-for-testing/chrome',
+                    '/app/.chrome/chrome',
+                ]
+                for chrome_bin in possible_chrome_bins:
+                    if os.path.exists(chrome_bin):
+                        asyncio.run(send_to_telegram(f"✅ Found Chrome binary: {chrome_bin}", is_error=False))
 
             # Find Chrome binary from known locations
             chrome_paths = [
                 os.environ.get('CHROME_BIN'),  # Check environment variable first
                 os.environ.get('GOOGLE_CHROME_BIN'),  # Alternative env var
-                os.environ.get('GOOGLE_CHROME_SHIM'),  # Buildpack sets this
+                os.environ.get('GOOGLE_CHROME_SHIM'),  # Old buildpack
+                '/app/.chrome-for-testing/chrome-linux64/chrome',  # chrome-for-testing buildpack
+                '/app/.chrome-for-testing/chrome',  # chrome-for-testing alt path
+                '/app/.chrome/chrome',  # Alternative location
                 '/app/.apt/usr/bin/google-chrome',  # Heroku apt buildpack
                 '/usr/bin/google-chrome',  # Standard location
                 '/usr/bin/google-chrome-stable',  # Alternative standard location
