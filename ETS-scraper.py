@@ -245,7 +245,31 @@ def run_selenium(context_data, stop_event):
         is_production = os.environ.get('DYNO') or os.environ.get('CHROME_BIN')
 
         if is_production:
-            options.binary_location = os.environ.get('CHROME_BIN', '/usr/bin/google-chrome-stable')
+            # Find Chrome binary from known locations
+            chrome_paths = [
+                os.environ.get('CHROME_BIN'),  # Check environment variable first
+                os.environ.get('GOOGLE_CHROME_BIN'),  # Alternative env var
+                '/app/.apt/usr/bin/google-chrome',  # Heroku apt buildpack
+                '/usr/bin/google-chrome',  # Standard location
+                '/usr/bin/google-chrome-stable',  # Alternative standard location
+            ]
+
+            chrome_binary = None
+            for path in chrome_paths:
+                if path and os.path.exists(path):
+                    chrome_binary = path
+                    if is_heroku:
+                        asyncio.run(send_to_telegram(f"✅ Found Chrome at: {path}", is_error=False))
+                    break
+
+            if chrome_binary:
+                options.binary_location = chrome_binary
+            else:
+                error_msg = "❌ Chrome binary not found in any expected location"
+                if is_heroku:
+                    asyncio.run(send_error_to_telegram(error_msg))
+                raise Exception(error_msg)
+
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--single-process')
