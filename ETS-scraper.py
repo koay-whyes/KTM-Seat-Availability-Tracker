@@ -324,7 +324,30 @@ def run_selenium(context_data, stop_event):
             try:
                 if is_heroku and retry_count > 0:
                     asyncio.run(send_to_telegram(f"Retry {retry_count}/{max_retries}", is_error=False))
-                service = Service(ChromeDriverManager().install())
+
+                # Use ChromeDriver from chrome-for-testing buildpack if available
+                chromedriver_paths = [
+                    '/app/.chrome-for-testing/chromedriver-linux64/chromedriver',  # chrome-for-testing buildpack
+                    os.environ.get('CHROMEDRIVER_PATH'),  # Environment variable
+                ]
+
+                chromedriver_path = None
+                for path in chromedriver_paths:
+                    if path and os.path.exists(path):
+                        chromedriver_path = path
+                        if is_heroku:
+                            asyncio.run(send_to_telegram(f"✅ Using ChromeDriver: {path}", is_error=False))
+                        break
+
+                if chromedriver_path:
+                    # Use the matching ChromeDriver from buildpack
+                    service = Service(chromedriver_path)
+                else:
+                    # Fall back to ChromeDriverManager (for local development)
+                    if is_heroku:
+                        asyncio.run(send_to_telegram("Using ChromeDriverManager (fallback)", is_error=False))
+                    service = Service(ChromeDriverManager().install())
+
                 driver = webdriver.Chrome(service=service, options=options)
                 driver.set_page_load_timeout(120)
                 driver.implicitly_wait(60)
