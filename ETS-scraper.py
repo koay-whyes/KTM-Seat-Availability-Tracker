@@ -241,14 +241,33 @@ def run_selenium(context_data, stop_event):
                 pass  # Skip if psutil not available
         print("=== STARTING SCRAPING SESSION ===")
 
+        driver = None  # Initialize early to avoid UnboundLocalError
         options = Options()
         is_production = os.environ.get('DYNO') or os.environ.get('CHROME_BIN')
 
         if is_production:
+            # Debug: Log environment variables
+            if is_heroku:
+                chrome_env_vars = {k: v for k, v in os.environ.items() if 'CHROME' in k or 'GOOGLE' in k}
+                if chrome_env_vars:
+                    asyncio.run(send_to_telegram(f"Chrome env vars: {chrome_env_vars}", is_error=False))
+                else:
+                    asyncio.run(send_to_telegram("No Chrome-related env vars found", is_error=False))
+
+                # Debug: Check what's in /app/.apt/usr/bin/
+                try:
+                    if os.path.exists('/app/.apt/usr/bin/'):
+                        files = os.listdir('/app/.apt/usr/bin/')
+                        chrome_files = [f for f in files if 'chrome' in f.lower() or 'google' in f.lower()]
+                        asyncio.run(send_to_telegram(f"Chrome files in /app/.apt/usr/bin/: {chrome_files}", is_error=False))
+                except Exception as e:
+                    asyncio.run(send_to_telegram(f"Error checking /app/.apt/usr/bin/: {e}", is_error=False))
+
             # Find Chrome binary from known locations
             chrome_paths = [
                 os.environ.get('CHROME_BIN'),  # Check environment variable first
                 os.environ.get('GOOGLE_CHROME_BIN'),  # Alternative env var
+                os.environ.get('GOOGLE_CHROME_SHIM'),  # Buildpack sets this
                 '/app/.apt/usr/bin/google-chrome',  # Heroku apt buildpack
                 '/usr/bin/google-chrome',  # Standard location
                 '/usr/bin/google-chrome-stable',  # Alternative standard location
@@ -278,7 +297,6 @@ def run_selenium(context_data, stop_event):
         options.add_argument('--disable-gpu')
         options.add_argument('--window-size=1920,1080')
 
-        driver = None
         max_retries = 3
         retry_count = 0
 
