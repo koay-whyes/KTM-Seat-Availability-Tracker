@@ -62,16 +62,6 @@ def check_heroku_environment():
         '/app/.apt/usr/bin/google-chrome'
     ]
 
-    chrome_found = False
-    for path in chrome_paths:
-        if os.path.exists(path):
-            chrome_found = True
-            checks.append(f"✅ Chrome found at: {path}")
-            break
-
-    if not chrome_found:
-        checks.append("❌ Chrome not found in expected locations")
-
     # Check critical dependencies
     dependencies = [
         ('/usr/bin/wget', 'wget'),
@@ -105,7 +95,11 @@ async def verify_environment():
     """Run environment checks and report to Telegram if on Heroku"""
     if os.environ.get('DYNO'):
         environment_report = check_heroku_environment()
-        await send_to_telegram(f"Environment Check:\n{environment_report}", is_error=False)
+        print(f"\n{'='*50}")
+        print("Environment Check:")
+        print('='*50)
+        print(environment_report)
+        print(f"{'='*50}\n")
 
 async def send_to_telegram(message, chat_id=None, is_error=False):
     """Send messages to Telegram for debugging - separate error vs success"""
@@ -390,7 +384,7 @@ def run_selenium(context_data, stop_event):
                 WebDriverWait(driver, 30).until(
                     EC.presence_of_element_located((By.TAG_NAME, "body"))
                 )
-                asyncio.run(send_to_telegram("Page loaded successfully", is_error=False))
+                # asyncio.run(send_to_telegram("Page loaded successfully", is_error=False))
             except Exception as e:
                 raise Exception(f"Failed to load page: {e}")
 
@@ -429,7 +423,7 @@ def run_selenium(context_data, stop_event):
                     EC.element_to_be_clickable((By.XPATH, f"//div[@class='station-name' and text()='{origin}']"))
                 )
                 origin_option.click()
-                asyncio.run(send_to_telegram("Origin selected", is_error=False))
+                # asyncio.run(send_to_telegram("Origin selected", is_error=False))
             except Exception as e:
                 raise Exception(f"Failed to select origin '{origin}': {e}")
 
@@ -450,7 +444,7 @@ def run_selenium(context_data, stop_event):
                     EC.element_to_be_clickable((By.XPATH, f"//div[@class='station-name' and text()='{dest}']"))
                 )
                 dest_option.click()
-                asyncio.run(send_to_telegram("Destination selected", is_error=False))
+                # asyncio.run(send_to_telegram("Destination selected", is_error=False))
             except Exception as e:
                 raise Exception(f"Failed to select destination '{dest}': {e}")
 
@@ -480,7 +474,7 @@ def run_selenium(context_data, stop_event):
                     EC.element_to_be_clickable((By.XPATH, "//a[contains(@class, 'close-date-btn') and text()='X']"))
                 )
                 close_button.click()
-                asyncio.run(send_to_telegram("Date set", is_error=False))
+                # asyncio.run(send_to_telegram("Date set", is_error=False))
             except Exception as e:
                 raise Exception(f"Failed to set date '{date}': {e}")
 
@@ -494,7 +488,7 @@ def run_selenium(context_data, stop_event):
                     EC.element_to_be_clickable((By.ID, "btnSubmit"))
                 )
                 search_button.click()
-                asyncio.run(send_to_telegram("Search initiated", is_error=False))
+                # asyncio.run(send_to_telegram("Search initiated", is_error=False))
             except Exception as e:
                 raise Exception(f"Failed to click search button: {e}") 
 
