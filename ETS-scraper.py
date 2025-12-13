@@ -255,7 +255,7 @@ def run_selenium(context_data, stop_event):
                 try:
                     if os.path.exists(dir_path):
                         files = os.listdir(dir_path)
-                        print(f"Found {dir_path}: {files[:5]}")
+                        print(f"✅ Found {dir_path}: {files[:5]}")
                 except Exception as e:
                     pass
 
