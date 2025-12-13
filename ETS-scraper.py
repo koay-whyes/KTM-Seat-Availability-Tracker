@@ -240,9 +240,9 @@ def run_selenium(context_data, stop_event):
             # Debug: Log environment variables
             chrome_env_vars = {k: v for k, v in os.environ.items() if 'CHROME' in k or 'GOOGLE' in k}
             if chrome_env_vars:
-                print(f"Chrome env vars: {chrome_env_vars}", is_error=False)
+                print(f"Chrome env vars: {chrome_env_vars}")
             else:
-                print("No Chrome-related env vars found", is_error=False)
+                print("No Chrome-related env vars found")
 
             # Debug: Check chrome-for-testing directory
             chrome_test_dirs = [
@@ -255,7 +255,7 @@ def run_selenium(context_data, stop_event):
                 try:
                     if os.path.exists(dir_path):
                         files = os.listdir(dir_path)
-                        print(f"Found {dir_path}: {files[:5]}", is_error=False)
+                        print(f"Found {dir_path}: {files[:5]}")
                 except Exception as e:
                     pass
 
@@ -267,7 +267,7 @@ def run_selenium(context_data, stop_event):
             ]
             for chrome_bin in possible_chrome_bins:
                 if os.path.exists(chrome_bin):
-                    print(f"✅ Found Chrome binary: {chrome_bin}", is_error=False)
+                    print(f"✅ Found Chrome binary: {chrome_bin}")
 
             # Find Chrome binary from known locations
             chrome_paths = [
@@ -287,7 +287,7 @@ def run_selenium(context_data, stop_event):
                 if path and os.path.exists(path):
                     chrome_binary = path
                     if is_heroku:
-                        print(f"✅ Found Chrome at: {path}", is_error=False)
+                        print(f"✅ Found Chrome at: {path}")
                     break
 
             if chrome_binary:
@@ -313,7 +313,7 @@ def run_selenium(context_data, stop_event):
         while retry_count < max_retries and not stop_event.is_set():
             try:
                 if is_heroku and retry_count > 0:
-                    print(f"Retry {retry_count}/{max_retries}", is_error=False)
+                    print(f"Retry {retry_count}/{max_retries}")
 
                 # Use ChromeDriver from chrome-for-testing buildpack if available
                 chromedriver_paths = [
@@ -326,7 +326,7 @@ def run_selenium(context_data, stop_event):
                     if path and os.path.exists(path):
                         chromedriver_path = path
                         if is_heroku:
-                            print(f"✅ Using ChromeDriver: {path}", is_error=False)
+                            print(f"✅ Using ChromeDriver: {path}")
                         break
 
                 if chromedriver_path:
@@ -335,7 +335,7 @@ def run_selenium(context_data, stop_event):
                 else:
                     # Fall back to ChromeDriverManager (for local development)
                     if is_heroku:
-                        print("Using ChromeDriverManager (fallback)", is_error=False)
+                        print("Using ChromeDriverManager (fallback)")
                     service = Service(ChromeDriverManager().install())
 
                 driver = webdriver.Chrome(service=service, options=options)
@@ -343,7 +343,7 @@ def run_selenium(context_data, stop_event):
                 driver.implicitly_wait(60)
 
                 if is_heroku:
-                    print("✅ ChromeDriver initialized on Heroku", is_error=False)
+                    print("✅ ChromeDriver initialized on Heroku")
                 break
 
             except Exception as e:
