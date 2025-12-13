@@ -1,0 +1,15 @@
+{
+  "name": "KTM Seat Availability Tracker",
+  "description": "A Telegram bot that tracks KTM train seat availability",
+  "buildpacks": [
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-apt"
+    },
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-chrome-for-testing"
+    },
+    {
+      "url": "heroku/python"
+    }
+  ]
+}

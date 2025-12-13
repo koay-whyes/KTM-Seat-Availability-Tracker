@@ -44,66 +44,62 @@ message = 'null'
 
 url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
 
-def check_koyeb_environment():
-    """Check if we're running on Koyeb and verify environment setup"""
-    is_koyeb = os.environ.get('koyeb') is not None
-    
-    if not is_koyeb:
+def check_heroku_environment():
+    """Check if we're running on Heroku and verify environment setup"""
+    is_heroku = os.environ.get('DYNO') is not None
+
+    if not is_heroku:
         return "✅ Running locally - environment checks skipped"
-    
+
     checks = []
-    
+    checks.append(f"✅ Running on Heroku (DYNO: {os.environ.get('DYNO')})")
+
     # Check Chrome installation
     chrome_paths = [
         '/usr/bin/google-chrome-stable',
         '/usr/bin/google-chrome',
+        '/app/.chromedriver/bin/chromedriver',
         '/app/.apt/usr/bin/google-chrome'
     ]
-    
-    chrome_found = False
-    for path in chrome_paths:
-        if os.path.exists(path):
-            chrome_found = True
-            checks.append(f"✅ Chrome found at: {path}")
-            break
-    
-    if not chrome_found:
-        checks.append("❌ Chrome not found in expected locations")
-    
+
     # Check critical dependencies
     dependencies = [
         ('/usr/bin/wget', 'wget'),
         ('/usr/bin/curl', 'curl'),
         ('/usr/bin/unzip', 'unzip')
     ]
-    
+
     for path, name in dependencies:
         if os.path.exists(path):
             checks.append(f"✅ {name} found")
         else:
             checks.append(f"❌ {name} not found")
-    
+
     # Check memory constraints
     try:
         import psutil
         memory = psutil.virtual_memory()
         checks.append(f"✅ Memory: {memory.percent}% used, {memory.available//1024//1024}MB available")
-        
+
         if memory.percent > 85:
             checks.append("⚠️  High memory usage detected - consider optimizing")
-            
+
     except ImportError:
         checks.append("ℹ️  psutil not available for memory monitoring")
     except Exception as e:
         checks.append(f"ℹ️  Memory check failed: {e}")
-    
+
     return "\n".join(checks)
 
 async def verify_environment():
-    """Run environment checks and report to Telegram if on Koyeb"""
-    if os.environ.get('KOYEB' or 'Koyeb' or 'koyeb'):
-        environment_report = check_koyeb_environment()
-        await send_to_telegram(f"Environment Check:\n{environment_report}", is_error=False)
+    """Run environment checks and report to Telegram if on Heroku"""
+    if os.environ.get('DYNO'):
+        environment_report = check_heroku_environment()
+        print(f"\n{'='*50}")
+        print("Environment Check:")
+        print('='*50)
+        print(environment_report)
+        print(f"{'='*50}\n")
 
 async def send_to_telegram(message, chat_id=None, is_error=False):
     """Send messages to Telegram for debugging - separate error vs success"""
@@ -222,28 +218,86 @@ def cleanup_user_task(user_id, task):
 
 def run_selenium(context_data, stop_event):
     try:
-        is_koyeb = os.environ.get('KOYEB' or 'Koyeb' or 'koyeb') is not None
-        
-        if is_koyeb:
-            # Koyeb-specific initialization
-            asyncio.run(send_to_telegram("🚀 Starting scraping on Koyeb", is_error=False))
-            
+        is_heroku = os.environ.get('DYNO') is not None
+
+        if is_heroku:
             # Check resource availability before starting
             try:
                 import psutil
                 memory = psutil.virtual_memory()
                 if memory.percent > 90:
-                    asyncio.run(send_error_to_telegram(f"High memory pressure: {memory.percent}%"))
+                    print(f"High memory pressure: {memory.percent}%")
                     return None
             except:
                 pass  # Skip if psutil not available
         print("=== STARTING SCRAPING SESSION ===")
-        
+
+        driver = None  # Initialize early to avoid UnboundLocalError
         options = Options()
-        is_production = os.environ.get('DYNO') or os.environ.get('KOYEB' or 'Koyeb' or 'koyeb') or os.environ.get('CHROME_BIN')
-        
+        is_production = os.environ.get('DYNO') or os.environ.get('CHROME_BIN')
+
         if is_production:
-            options.binary_location = os.environ.get('CHROME_BIN', '/usr/bin/google-chrome-stable')
+            # Debug: Log environment variables
+            chrome_env_vars = {k: v for k, v in os.environ.items() if 'CHROME' in k or 'GOOGLE' in k}
+            if chrome_env_vars:
+                print(f"Chrome env vars: {chrome_env_vars}")
+            else:
+                print("No Chrome-related env vars found")
+
+            # Debug: Check chrome-for-testing directory
+            chrome_test_dirs = [
+                '/app/.chrome-for-testing',
+                '/app/.chrome-for-testing/chrome-linux64',
+                '/app/.chrome',
+                '/app/.chromedriver'
+            ]
+            for dir_path in chrome_test_dirs:
+                try:
+                    if os.path.exists(dir_path):
+                        files = os.listdir(dir_path)
+                        print(f"✅ Found {dir_path}: {files[:5]}")
+                except Exception as e:
+                    pass
+
+            # Check for chrome binary specifically
+            possible_chrome_bins = [
+                '/app/.chrome-for-testing/chrome-linux64/chrome',
+                '/app/.chrome-for-testing/chrome',
+                '/app/.chrome/chrome',
+            ]
+            for chrome_bin in possible_chrome_bins:
+                if os.path.exists(chrome_bin):
+                    print(f"✅ Found Chrome binary: {chrome_bin}")
+
+            # Find Chrome binary from known locations
+            chrome_paths = [
+                os.environ.get('CHROME_BIN'),  # Check environment variable first
+                os.environ.get('GOOGLE_CHROME_BIN'),  # Alternative env var
+                os.environ.get('GOOGLE_CHROME_SHIM'),  # Old buildpack
+                '/app/.chrome-for-testing/chrome-linux64/chrome',  # chrome-for-testing buildpack
+                '/app/.chrome-for-testing/chrome',  # chrome-for-testing alt path
+                '/app/.chrome/chrome',  # Alternative location
+                '/app/.apt/usr/bin/google-chrome',  # Heroku apt buildpack
+                '/usr/bin/google-chrome',  # Standard location
+                '/usr/bin/google-chrome-stable',  # Alternative standard location
+            ]
+
+            chrome_binary = None
+            for path in chrome_paths:
+                if path and os.path.exists(path):
+                    chrome_binary = path
+                    if is_heroku:
+                        print(f"✅ Found Chrome at: {path}")
+                    break
+
+            if chrome_binary:
+                options.binary_location = chrome_binary
+            else:
+                error_msg = "❌ Chrome binary not found in any expected location"
+                if is_heroku:
+                    print(error_msg)
+                raise Exception(error_msg)
+
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--single-process')
@@ -252,40 +306,62 @@ def run_selenium(context_data, stop_event):
         options.add_argument('--disable-gpu')
         options.add_argument('--window-size=1920,1080')
 
-        driver = None
         max_retries = 3
         retry_count = 0
 
         # ChromeDriver initialization with detailed error handling
         while retry_count < max_retries and not stop_event.is_set():
             try:
-                if is_koyeb and retry_count > 0:
-                    asyncio.run(send_to_telegram(f"Retry {retry_count}/{max_retries}", is_error=False))
-                service = Service(ChromeDriverManager().install())
+                if is_heroku and retry_count > 0:
+                    print(f"Retry {retry_count}/{max_retries}")
+
+                # Use ChromeDriver from chrome-for-testing buildpack if available
+                chromedriver_paths = [
+                    '/app/.chrome-for-testing/chromedriver-linux64/chromedriver',  # chrome-for-testing buildpack
+                    os.environ.get('CHROMEDRIVER_PATH'),  # Environment variable
+                ]
+
+                chromedriver_path = None
+                for path in chromedriver_paths:
+                    if path and os.path.exists(path):
+                        chromedriver_path = path
+                        if is_heroku:
+                            print(f"✅ Using ChromeDriver: {path}")
+                        break
+
+                if chromedriver_path:
+                    # Use the matching ChromeDriver from buildpack
+                    service = Service(chromedriver_path)
+                else:
+                    # Fall back to ChromeDriverManager (for local development)
+                    if is_heroku:
+                        print("Using ChromeDriverManager (fallback)")
+                    service = Service(ChromeDriverManager().install())
+
                 driver = webdriver.Chrome(service=service, options=options)
                 driver.set_page_load_timeout(120)
                 driver.implicitly_wait(60)
 
-                if is_koyeb:
-                    asyncio.run(send_to_telegram("✅ ChromeDriver initialized on Koyeb", is_error=False))
+                if is_heroku:
+                    print("✅ ChromeDriver initialized on Heroku")
                 break
-                
+
             except Exception as e:
                 retry_count += 1
                 error_msg = f"ChromeDriver init attempt {retry_count}: {str(e)}"
-                
-                if is_koyeb:
-                    asyncio.run(send_error_to_telegram(error_msg))
-                
+
+                if is_heroku:
+                    print(error_msg)
+
                 if retry_count >= max_retries:
-                    if is_koyeb:
-                        asyncio.run(send_error_to_telegram("❌ ChromeDriver failed after all retries"))
+                    if is_heroku:
+                        print("❌ ChromeDriver failed after all retries")
                     raise Exception(f"Failed to initialize ChromeDriver after {max_retries} attempts: {e}")
-                
-                sleep(10 if is_koyeb else 5)  # Longer sleep on Koyeb
+
+                sleep(5) 
 
         if driver is None or stop_event.is_set():
-            if is_koyeb:
+            if is_heroku:
                 asyncio.run(send_to_telegram("Scraping cancelled before starting", is_error=False))
             return None
         try:
@@ -304,7 +380,7 @@ def run_selenium(context_data, stop_event):
                 WebDriverWait(driver, 30).until(
                     EC.presence_of_element_located((By.TAG_NAME, "body"))
                 )
-                asyncio.run(send_to_telegram("Page loaded successfully", is_error=False))
+                # asyncio.run(send_to_telegram("Page loaded successfully", is_error=False))
             except Exception as e:
                 raise Exception(f"Failed to load page: {e}")
 
@@ -343,7 +419,7 @@ def run_selenium(context_data, stop_event):
                     EC.element_to_be_clickable((By.XPATH, f"//div[@class='station-name' and text()='{origin}']"))
                 )
                 origin_option.click()
-                asyncio.run(send_to_telegram("Origin selected", is_error=False))
+                # asyncio.run(send_to_telegram("Origin selected", is_error=False))
             except Exception as e:
                 raise Exception(f"Failed to select origin '{origin}': {e}")
 
@@ -364,7 +440,7 @@ def run_selenium(context_data, stop_event):
                     EC.element_to_be_clickable((By.XPATH, f"//div[@class='station-name' and text()='{dest}']"))
                 )
                 dest_option.click()
-                asyncio.run(send_to_telegram("Destination selected", is_error=False))
+                # asyncio.run(send_to_telegram("Destination selected", is_error=False))
             except Exception as e:
                 raise Exception(f"Failed to select destination '{dest}': {e}")
 
@@ -394,7 +470,7 @@ def run_selenium(context_data, stop_event):
                     EC.element_to_be_clickable((By.XPATH, "//a[contains(@class, 'close-date-btn') and text()='X']"))
                 )
                 close_button.click()
-                asyncio.run(send_to_telegram("Date set", is_error=False))
+                # asyncio.run(send_to_telegram("Date set", is_error=False))
             except Exception as e:
                 raise Exception(f"Failed to set date '{date}': {e}")
 
@@ -408,7 +484,7 @@ def run_selenium(context_data, stop_event):
                     EC.element_to_be_clickable((By.ID, "btnSubmit"))
                 )
                 search_button.click()
-                asyncio.run(send_to_telegram("Search initiated", is_error=False))
+                # asyncio.run(send_to_telegram("Search initiated", is_error=False))
             except Exception as e:
                 raise Exception(f"Failed to click search button: {e}") 
 
@@ -631,53 +707,53 @@ def run_selenium(context_data, stop_event):
 async def start_scraping(update: Update, context: ContextTypes.DEFAULT_TYPE, stop_event: threading.Event):
     user_id = update.message.from_user.id
     chat_id = update.effective_chat.id
-    is_koyeb = os.environ.get('KOYEB') is not None
-    
+    is_heroku = os.environ.get('DYNO') is not None
+
     try:
-        if is_koyeb:
-            await context.bot.send_message(chat_id=chat_id, text="🔄 Starting scraping on Koyeb...")
+        if is_heroku:
+            await context.bot.send_message(chat_id=chat_id, text="🔄 Starting scraping on Heroku...")
             # Run environment verification
             await verify_environment()
         else:
             await context.bot.send_message(chat_id=chat_id, text="🔄 Starting scraping process...")
 
         # Adjust timeout based on environment
-        timeout = 600 if is_koyeb else 300  # 10 minutes for Koyeb, 5 for local
+        timeout = 600 if is_heroku else 300  # 10 minutes for Heroku, 5 for local
 
         loop = asyncio.get_event_loop()
         result = await asyncio.wait_for(
             loop.run_in_executor(None, lambda: run_selenium(context.user_data, stop_event)),
             timeout=timeout
         )
-        
+
         if stop_event.is_set():
             await context.bot.send_message(chat_id=chat_id, text="⏹️ Scraping cancelled by user")
             return
-            
+
         if result is None:
             error_msg = "Scraping returned no results - likely failed during execution"
-            if is_koyeb:
+            if is_heroku:
                 await send_error_to_telegram(error_msg, chat_id=chat_id)
             await context.bot.send_message(chat_id=chat_id, text="❌ Scraping failed - no results obtained")
         else:
             await process_and_send_results(update, context, result)
-            
+
     except asyncio.TimeoutError:
-        error_msg = f"Scraping timed out after {'10' if is_koyeb else '5'} minutes"
-        if is_koyeb:
+        error_msg = f"Scraping timed out after {'10' if is_heroku else '5'} minutes"
+        if is_heroku:
             await send_error_to_telegram(error_msg, chat_id=chat_id)
         await context.bot.send_message(chat_id=chat_id, text="⏰ Scraping timed out")
-        
+
     except asyncio.CancelledError:
         await context.bot.send_message(chat_id=chat_id, text="⏹️ Scraping cancelled")
-        
+
     except Exception as e:
         error_msg = f"Unexpected error: {str(e)}"
-        if is_koyeb:
+        if is_heroku:
             await send_error_to_telegram(error_msg, chat_id=chat_id)
             await send_error_to_telegram(f"Traceback: {traceback.format_exc()}", chat_id=chat_id)
         await context.bot.send_message(chat_id=chat_id, text="❌ Unexpected error during scraping")
-        
+
     finally:
         cleanup_user_task(user_id, asyncio.current_task())
 
