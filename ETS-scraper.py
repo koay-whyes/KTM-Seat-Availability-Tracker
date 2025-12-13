@@ -221,15 +221,12 @@ def run_selenium(context_data, stop_event):
         is_heroku = os.environ.get('DYNO') is not None
 
         if is_heroku:
-            # Heroku-specific initialization
-            asyncio.run(send_to_telegram("🚀 Starting scraping on Heroku", is_error=False))
-
             # Check resource availability before starting
             try:
                 import psutil
                 memory = psutil.virtual_memory()
                 if memory.percent > 90:
-                    asyncio.run(send_error_to_telegram(f"High memory pressure: {memory.percent}%"))
+                    print(f"High memory pressure: {memory.percent}%")
                     return None
             except:
                 pass  # Skip if psutil not available
@@ -241,37 +238,36 @@ def run_selenium(context_data, stop_event):
 
         if is_production:
             # Debug: Log environment variables
-            if is_heroku:
-                chrome_env_vars = {k: v for k, v in os.environ.items() if 'CHROME' in k or 'GOOGLE' in k}
-                if chrome_env_vars:
-                    asyncio.run(send_to_telegram(f"Chrome env vars: {chrome_env_vars}", is_error=False))
-                else:
-                    asyncio.run(send_to_telegram("No Chrome-related env vars found", is_error=False))
+            chrome_env_vars = {k: v for k, v in os.environ.items() if 'CHROME' in k or 'GOOGLE' in k}
+            if chrome_env_vars:
+                print(f"Chrome env vars: {chrome_env_vars}", is_error=False)
+            else:
+                print("No Chrome-related env vars found", is_error=False)
 
-                # Debug: Check chrome-for-testing directory
-                chrome_test_dirs = [
-                    '/app/.chrome-for-testing',
-                    '/app/.chrome-for-testing/chrome-linux64',
-                    '/app/.chrome',
-                    '/app/.chromedriver'
-                ]
-                for dir_path in chrome_test_dirs:
-                    try:
-                        if os.path.exists(dir_path):
-                            files = os.listdir(dir_path)
-                            asyncio.run(send_to_telegram(f"Found {dir_path}: {files[:5]}", is_error=False))
-                    except Exception as e:
-                        pass
+            # Debug: Check chrome-for-testing directory
+            chrome_test_dirs = [
+                '/app/.chrome-for-testing',
+                '/app/.chrome-for-testing/chrome-linux64',
+                '/app/.chrome',
+                '/app/.chromedriver'
+            ]
+            for dir_path in chrome_test_dirs:
+                try:
+                    if os.path.exists(dir_path):
+                        files = os.listdir(dir_path)
+                        print(f"Found {dir_path}: {files[:5]}", is_error=False)
+                except Exception as e:
+                    pass
 
-                # Check for chrome binary specifically
-                possible_chrome_bins = [
-                    '/app/.chrome-for-testing/chrome-linux64/chrome',
-                    '/app/.chrome-for-testing/chrome',
-                    '/app/.chrome/chrome',
-                ]
-                for chrome_bin in possible_chrome_bins:
-                    if os.path.exists(chrome_bin):
-                        asyncio.run(send_to_telegram(f"✅ Found Chrome binary: {chrome_bin}", is_error=False))
+            # Check for chrome binary specifically
+            possible_chrome_bins = [
+                '/app/.chrome-for-testing/chrome-linux64/chrome',
+                '/app/.chrome-for-testing/chrome',
+                '/app/.chrome/chrome',
+            ]
+            for chrome_bin in possible_chrome_bins:
+                if os.path.exists(chrome_bin):
+                    print(f"✅ Found Chrome binary: {chrome_bin}", is_error=False)
 
             # Find Chrome binary from known locations
             chrome_paths = [
@@ -291,7 +287,7 @@ def run_selenium(context_data, stop_event):
                 if path and os.path.exists(path):
                     chrome_binary = path
                     if is_heroku:
-                        asyncio.run(send_to_telegram(f"✅ Found Chrome at: {path}", is_error=False))
+                        print(f"✅ Found Chrome at: {path}", is_error=False)
                     break
 
             if chrome_binary:
@@ -299,7 +295,7 @@ def run_selenium(context_data, stop_event):
             else:
                 error_msg = "❌ Chrome binary not found in any expected location"
                 if is_heroku:
-                    asyncio.run(send_error_to_telegram(error_msg))
+                    print(error_msg)
                 raise Exception(error_msg)
 
             options.add_argument('--no-sandbox')
@@ -317,7 +313,7 @@ def run_selenium(context_data, stop_event):
         while retry_count < max_retries and not stop_event.is_set():
             try:
                 if is_heroku and retry_count > 0:
-                    asyncio.run(send_to_telegram(f"Retry {retry_count}/{max_retries}", is_error=False))
+                    print(f"Retry {retry_count}/{max_retries}", is_error=False)
 
                 # Use ChromeDriver from chrome-for-testing buildpack if available
                 chromedriver_paths = [
@@ -330,7 +326,7 @@ def run_selenium(context_data, stop_event):
                     if path and os.path.exists(path):
                         chromedriver_path = path
                         if is_heroku:
-                            asyncio.run(send_to_telegram(f"✅ Using ChromeDriver: {path}", is_error=False))
+                            print(f"✅ Using ChromeDriver: {path}", is_error=False)
                         break
 
                 if chromedriver_path:
@@ -339,7 +335,7 @@ def run_selenium(context_data, stop_event):
                 else:
                     # Fall back to ChromeDriverManager (for local development)
                     if is_heroku:
-                        asyncio.run(send_to_telegram("Using ChromeDriverManager (fallback)", is_error=False))
+                        print("Using ChromeDriverManager (fallback)", is_error=False)
                     service = Service(ChromeDriverManager().install())
 
                 driver = webdriver.Chrome(service=service, options=options)
@@ -347,7 +343,7 @@ def run_selenium(context_data, stop_event):
                 driver.implicitly_wait(60)
 
                 if is_heroku:
-                    asyncio.run(send_to_telegram("✅ ChromeDriver initialized on Heroku", is_error=False))
+                    print("✅ ChromeDriver initialized on Heroku", is_error=False)
                 break
 
             except Exception as e:
@@ -355,14 +351,14 @@ def run_selenium(context_data, stop_event):
                 error_msg = f"ChromeDriver init attempt {retry_count}: {str(e)}"
 
                 if is_heroku:
-                    asyncio.run(send_error_to_telegram(error_msg))
+                    print(error_msg)
 
                 if retry_count >= max_retries:
                     if is_heroku:
-                        asyncio.run(send_error_to_telegram("❌ ChromeDriver failed after all retries"))
+                        print("❌ ChromeDriver failed after all retries")
                     raise Exception(f"Failed to initialize ChromeDriver after {max_retries} attempts: {e}")
 
-                sleep(10 if is_heroku else 5)  # Longer sleep on Heroku
+                sleep(5) 
 
         if driver is None or stop_event.is_set():
             if is_heroku:
