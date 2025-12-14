@@ -33,12 +33,15 @@ import sys
 # Global dictionary to track running tasks per user
 user_tasks = defaultdict(list)
 user_stop_events = defaultdict(threading.Event)
+user_selection_events = defaultdict(threading.Event)  # Signals when a user chose services
+user_selected_services = defaultdict(list)  # Train service names chosen by user
+user_available_trains = {}  # Latest available trains per user for selection prompt
 
 # Conversation states
 ORIGIN, DESTINATION, DATE = range(3)
 STATIONS = [["KL SENTRAL", "ALOR SETAR"], ["BUTTERWORTH", "IPOH"]]  # Add all stations
 
-TOKEN = '7588270975:AAFkEvc-Hf_ygG1Z6BgVv-n2iLLBXgrDH6k'
+TOKEN = '8129096986:AAGXjSSUq9ytKr092e5poNk2KStquSc3j7s'
 chat_id = '1235697766'
 message = 'null'
 
@@ -151,6 +154,14 @@ async def receive_destination(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def receive_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['date'] = update.message.text
     user_id = update.message.from_user.id
+    chat_id = update.effective_chat.id
+    # Track user/chat for downstream threads
+    context.user_data['user_id'] = user_id
+    context.user_data['chat_id'] = chat_id
+    # Reset selection state for this run
+    user_selection_events[user_id].clear()
+    user_selected_services[user_id].clear()
+    user_available_trains.pop(user_id, None)
     
     await update.message.reply_text(
         f"✅ Settings saved:\n"
@@ -192,6 +203,9 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for task in user_tasks[user_id]:
             if not task.done():
                 task.cancel()
+
+        # Unblock any pending selection waits
+        user_selection_events[user_id].set()
         
         # Clear the user's tasks
         user_tasks[user_id].clear()
@@ -215,10 +229,53 @@ def cleanup_user_task(user_id, task):
         if not user_tasks[user_id]:  # If no more tasks
             user_tasks.pop(user_id, None)
             user_stop_events.pop(user_id, None)
+            user_selection_events.pop(user_id, None)
+            user_selected_services.pop(user_id, None)
+            user_available_trains.pop(user_id, None)
+
+
+async def handle_service_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the user's choice of train services to monitor"""
+    user_id = update.message.from_user.id
+
+    if user_id not in user_available_trains:
+        await update.message.reply_text("No active train list. Use /start to begin a new search.")
+        return
+
+    raw = update.message.text
+    try:
+        indices = [int(part.strip()) for part in raw.split(',') if part.strip().isdigit()]
+    except Exception:
+        indices = []
+
+    available = user_available_trains.get(user_id, [])
+    chosen_services = []
+    for idx in indices:
+        if 1 <= idx <= len(available):
+            chosen_services.append(available[idx-1]['train_service'])
+
+    # Remove duplicates while preserving order
+    seen = set()
+    chosen_services = [s for s in chosen_services if not (s in seen or seen.add(s))]
+
+    if not chosen_services:
+        await update.message.reply_text(
+            "Please send numbers from the list, separated by commas (e.g. 1,3,5)."
+        )
+        return
+
+    user_selected_services[user_id] = chosen_services
+    user_selection_events[user_id].set()
+
+    await update.message.reply_text(
+        "🔔 Got it! Tracking these services:\n" + "\n".join(chosen_services)
+    )
 
 def run_selenium(context_data, stop_event):
     try:
         is_heroku = os.environ.get('DYNO') is not None
+        user_id = context_data.get('user_id')
+        chat_id = context_data.get('chat_id', '1235697766')
 
         if is_heroku:
             # Check resource availability before starting
@@ -587,22 +644,45 @@ def run_selenium(context_data, stop_event):
                     print("Stop requested after data extraction")
                     break
 
-                # Print structured data
+                # Print structured data and handle selection prompt on first scrape
                 for train in train_data:
                     print(train)
-                    # Send data to Telegram for first scrape only
-                    if previous_data is None:
-                        message = f"🚆 Train Service: {train['train_service']}\n" \
-                                f"🕒 Departure: {train['departure']}\n" \
-                                f"🕒 Arrival: {train['arrival']}\n" \
-                                f"💺 Seats Left: {train['seats_left']}\n" \
-                                f"💰 Fare: {train['fare']}"
-                        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
-                        r = requests.get(url)
+
                 if previous_data is None:
-                    message = f"Now checking for changes in seats left for {origin} to {dest} on {date}..."
+                    # Present choices to the user to track specific services
+                    user_available_trains[user_id] = train_data
+                    options = []
+                    for idx, train in enumerate(train_data, start=1):
+                        options.append(
+                            f"{idx}) {train['train_service']} | Dep {train['departure']} | Arr {train['arrival']} | Seats {train['seats_left']} | {train['fare']}"
+                        )
+                    prompt = (
+                        f"🚆 Available trains for {origin} ➜ {dest} on {date}:\n" +
+                        "\n".join(options) +
+                        "\n\nReply with the numbers of the services to track, separated by commas (e.g. 1,3,5)."
+                    )
+                    prompt_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={prompt}"
+                    requests.get(prompt_url)
+
+                    # Wait for user selection or stop request
+                    while not stop_event.is_set():
+                        if user_selection_events[user_id].wait(timeout=1):
+                            break
+                    if stop_event.is_set():
+                        break
+
+                    selected = user_selected_services.get(user_id, [])
+                    if not selected:
+                        # If user never picked anything, default to all to avoid silent run
+                        selected = [t['train_service'] for t in train_data]
+                        user_selected_services[user_id] = selected
+
+                    message = (
+                        "🔎 Tracking only: " + ", ".join(selected) + "\n" +
+                        f"Monitoring seat changes for {origin} ➜ {dest} on {date}."
+                    )
                     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
-                    r = requests.get(url)
+                    requests.get(url)
                 
                 # file_name = f"train_data_{origin}_to_{dest}_{date}.json"
                 # file_path = os.path.join(os.getcwd(), file_name)
@@ -634,37 +714,48 @@ def run_selenium(context_data, stop_event):
                 #     with open(file_path, "w") as file:
                 #         json.dump(train_data, file, indent=4)
                 #     print("Data saved for the first time")
-                def compare_data(train_data, previous_data, TOKEN, chat_id):
+                def compare_data(train_data, previous_data, selected_services, TOKEN, chat_id):
                     """Compare current data with previous data and send notifications for changes"""
                     if previous_data is None:
                         return
                         
                     if train_data != previous_data:
                         print("Data has changed")
-                        # Make sure we're comparing the same trains
-                        min_length = min(len(train_data), len(previous_data))
-                        
-                        for i in range(min_length):
+
+                        # Map by service name so ordering changes do not break comparisons
+                        current_by_service = {t['train_service']: t for t in train_data}
+                        previous_by_service = {t['train_service']: t for t in previous_data}
+
+                        # Determine which services we should watch
+                        services_to_check = selected_services if selected_services else list(current_by_service.keys())
+
+                        for service_name in services_to_check:
                             try:
+                                if service_name not in current_by_service or service_name not in previous_by_service:
+                                    continue
+
+                                current_entry = current_by_service[service_name]
+                                prev_entry = previous_by_service[service_name]
+
                                 # Extract numeric values from seat strings (e.g., "10" from "10 seats")
-                                current_seats = ''.join(filter(str.isdigit, train_data[i]['seats_left']))
-                                previous_seats = ''.join(filter(str.isdigit, previous_data[i]['seats_left']))
+                                current_seats = ''.join(filter(str.isdigit, current_entry['seats_left']))
+                                previous_seats = ''.join(filter(str.isdigit, prev_entry['seats_left']))
                                 
                                 current_seats = int(current_seats) if current_seats else 0
                                 previous_seats = int(previous_seats) if previous_seats else 0
                                 
                                 if current_seats < previous_seats:
-                                    message = f'😱 Seats left decreased\n{current_seats} seats left for {train_data[i]["train_service"]} departing at {train_data[i]["departure"]}'
+                                    message = f'😱 Seats left decreased\n{current_seats} seats left for {service_name} departing at {current_entry["departure"]}'
                                     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
                                     requests.get(url, timeout=5)
                                 elif current_seats > previous_seats:
-                                    message = f'😍 Seats left increased\n{current_seats} seats left for {train_data[i]["train_service"]} departing at {train_data[i]["departure"]}'
+                                    message = f'😍 Seats left increased\n{current_seats} seats left for {service_name} departing at {current_entry["departure"]}'
                                     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
                                     requests.get(url, timeout=5)
                             except Exception as e:
                                 print(f"Error comparing train data: {e}")
 
-                compare_data(train_data, previous_data, TOKEN, chat_id)
+                compare_data(train_data, previous_data, user_selected_services.get(user_id, []), TOKEN, chat_id)
                 # Save the new data in memory
                 previous_data = train_data
                 if stop_event.is_set():
@@ -703,6 +794,9 @@ def run_selenium(context_data, stop_event):
                 driver.quit()
             except Exception as e:
                 asyncio.run(send_error_to_telegram(f"Error quitting driver: {e}"))        
+
+
+
 
 async def start_scraping(update: Update, context: ContextTypes.DEFAULT_TYPE, stop_event: threading.Event):
     user_id = update.message.from_user.id
@@ -818,6 +912,8 @@ def main():
         )
 
         application.add_handler(CommandHandler("stop", stop))
+        # Handler for numeric comma-separated selections after the train list is shown
+        application.add_handler(MessageHandler(filters.Regex(r"^\d+(\s*,\s*\d+)*$"), handle_service_selection))
         application.add_handler(conv_handler)
         
         print("Bot started. Press Ctrl+C to stop.")
