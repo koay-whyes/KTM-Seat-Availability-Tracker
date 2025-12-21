@@ -44,7 +44,7 @@ STATIONS = [["KL SENTRAL", "ALOR SETAR"], ["BUTTERWORTH", "IPOH"]]  # Add all st
 
 # Dev Bot Token
 # TOKEN = '8129096986:AAGXjSSUq9ytKr092e5poNk2KStquSc3j7s' 
-TOKEN = '7588270975:AAFkEvc-Hf_ygG1Z6BgVv-n2iLLBXgrDH6k'
+TOKEN = '7588270975:AAHKJyInZdZ5O6dOUWkUr1l-AvSEKLEWqtE'
 chat_id = '1235697766'
 message = 'null'
 
@@ -846,6 +846,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         print("Another bot instance is already running!")
     else:
         print(f"Error: {error}")
+        traceback.print_exc()
 
 async def process_and_send_results(update, context, result):
     if result:
@@ -888,7 +889,8 @@ def main():
         application.add_handler(conv_handler)
         
         print("Bot started. Press Ctrl+C to stop.")
-        application.run_polling()
+        # Allow updates for all types to ensure polling works correctly
+        application.run_polling(allowed_updates=None)
         
     except KeyboardInterrupt:
         print("\nShutting down gracefully...")
