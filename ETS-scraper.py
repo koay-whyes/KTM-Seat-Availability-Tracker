@@ -44,7 +44,7 @@ STATIONS = [["KL SENTRAL", "ALOR SETAR"], ["BUTTERWORTH", "IPOH"]]  # Add all st
 
 # Dev Bot Token
 # TOKEN = '8129096986:AAGXjSSUq9ytKr092e5poNk2KStquSc3j7s' 
-TOKEN = '8388818376:AAFfJHr38O2sAoDKKEh_o8uOixQkyStxP3M'
+TOKEN = '8257954942:AAHMSoyY0UPQS2QCkwyhXbM2nf2wgUIrp4c'
 chat_id = '1235697766'
 message = 'null'
 
