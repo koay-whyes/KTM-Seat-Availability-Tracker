@@ -38,7 +38,7 @@ user_stop_events = defaultdict(threading.Event)
 ORIGIN, DESTINATION, DATE = range(3)
 STATIONS = [["KL SENTRAL", "ALOR SETAR"], ["BUTTERWORTH", "IPOH"]]  # Add all stations
 
-TOKEN = '7588270975:AAFkEvc-Hf_ygG1Z6BgVv-n2iLLBXgrDH6k'
+TOKEN = '8257954942:AAHMSoyY0UPQS2QCkwyhXbM2nf2wgUIrp4c'
 chat_id = '1235697766'
 message = 'null'
 
