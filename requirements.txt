@@ -15,6 +15,7 @@ python-json-logger==3.3.0
 python-telegram-bot==22.0
 pytz==2024.2
 pyzmq==26.2.0
+psycopg2-binary==2.9.10
 requests==2.32.3
 selenium==4.27.1
 six==1.17.0

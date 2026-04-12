@@ -1,1 +1,1 @@
-worker: python ETS-scraper.py
+worker: python main.py

@@ -46,4 +46,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Let webdriver-manager handle ChromeDriver at runtime
-CMD ["python", "ETS-scraper.py"]
+CMD ["python", "main.py"]
