@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 import requests
 import json
 import os
+from dotenv import load_dotenv
 import asyncio
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -42,13 +43,9 @@ user_available_trains = {}  # Latest available trains per user for selection pro
 ORIGIN, DESTINATION, DATE = range(3)
 STATIONS = [["KL SENTRAL", "ALOR SETAR"], ["BUTTERWORTH", "IPOH"]]  # Add all stations
 
-# Dev Bot Token
-# TOKEN = '8129096986:AAGXjSSUq9ytKr092e5poNk2KStquSc3j7s' 
-TOKEN = '8257954942:AAHMSoyY0UPQS2QCkwyhXbM2nf2wgUIrp4c'
-chat_id = '1235697766'
-message = 'null'
-
-url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
+load_dotenv()
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+DEFAULT_CHAT_ID = os.getenv("TELEGRAM_DEFAULT_CHAT_ID")
 
 def check_heroku_environment():
     """Check if we're running on Heroku and verify environment setup"""
@@ -111,7 +108,11 @@ async def send_to_telegram(message, chat_id=None, is_error=False):
     """Send messages to Telegram for debugging - separate error vs success"""
     try:
         if chat_id is None:
-            chat_id = '1235697766'  # Your default chat ID
+            chat_id = DEFAULT_CHAT_ID
+
+        if not chat_id:
+            print("Telegram message skipped: TELEGRAM_DEFAULT_CHAT_ID is not set")
+            return
         
         # Truncate very long messages
         if len(message) > 4000:
@@ -294,7 +295,7 @@ async def handle_service_selection(update: Update, context: ContextTypes.DEFAULT
 def run_selenium(context_data, stop_event):
     is_heroku = os.environ.get('DYNO') is not None
     user_id = context_data.get('user_id')
-    chat_id = context_data.get('chat_id', '1235697766')
+    chat_id = context_data.get('chat_id') or DEFAULT_CHAT_ID
 
     if is_heroku:
         # Check resource availability before starting
@@ -864,9 +865,13 @@ async def process_and_send_results(update, context, result):
 
 def main():
     try:
-        message = 'Welcome to KTM Seat Availability Tracker! Please type /start to begin.'
-        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={chat_id}&text={message}"
-        r = requests.get(url)
+        if not TOKEN:
+            raise RuntimeError("Missing TELEGRAM_BOT_TOKEN environment variable")
+
+        if DEFAULT_CHAT_ID:
+            message = 'Welcome to KTM Seat Availability Tracker! Please type /start to begin.'
+            url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={DEFAULT_CHAT_ID}&text={message}"
+            requests.get(url, timeout=10)
         
         application = ApplicationBuilder().token(TOKEN).build()
 
