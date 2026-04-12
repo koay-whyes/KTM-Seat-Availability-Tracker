@@ -4,20 +4,19 @@ import importlib
 import os
 from typing import Any, Optional
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-
 
 def get_database_connection() -> Optional[Any]:
-    if not DATABASE_URL:
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
         return None
 
     try:
         psycopg2 = importlib.import_module("psycopg2")
 
         try:
-            return psycopg2.connect(DATABASE_URL, sslmode="require")
+            return psycopg2.connect(database_url, sslmode="require")
         except Exception:
-            return psycopg2.connect(DATABASE_URL)
+            return psycopg2.connect(database_url)
     except Exception as e:
         print(f"Postgres connection unavailable: {e}")
         return None
