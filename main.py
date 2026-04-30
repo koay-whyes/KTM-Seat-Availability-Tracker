@@ -31,7 +31,9 @@ user_selected_services = defaultdict(list)
 user_available_trains = {}
 
 ORIGIN, DESTINATION, DATE = range(3)
-STATIONS = [["KL SENTRAL", "ALOR SETAR"], ["BUTTERWORTH", "IPOH"]]
+STATIONS = [["BDR TASEK SELATAN", "KL SENTRAL"], ["KUALA LUMPUR", "SUNGAI BULOH"], ["RAWANG", "TANJUNG MALIM"], 
+            ["KAMPAR", "BATU GAJAH"], ["IPOH","KUALA KANGSAR"],["TAIPING","BUKIT MERTAJAM"], ["SUNGAI PETANI", "GURUN"], 
+            ["ALOR SETAR", "ARAU"], ["PADANG BESAR"]]
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
